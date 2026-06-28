@@ -287,4 +287,176 @@ async function loadChildren() {
   renderChildren(data||[]);
 }
 
-function renderChildren(l
+function renderChildren(list) {
+  const el = document.getElementById("children-list");
+  el.innerHTML = "";
+  list.forEach((c,i) => {
+    const d = document.createElement("div");
+    d.className = "card";
+    d.innerHTML = `
+      <div style="width:52px;height:52px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:800;flex-shrink:0">${c.name[0].toUpperCase()}</div>
+      <div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div><div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaşında · ${c.total_sessions||0} oturum</div></div>
+      <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:30px;height:30px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;font-size:14px">🗑️</button>
+      <div style="font-size:20px;color:#d1d5db">›</div>
+    `;
+    d.onclick = () => startChat(c);
+    el.appendChild(d);
+  });
+}
+
+function showAddForm(){document.getElementById("add-form").classList.remove("hidden");document.getElementById("show-add-btn").classList.add("hidden");}
+function hideAddForm(){document.getElementById("add-form").classList.add("hidden");document.getElementById("show-add-btn").classList.remove("hidden");}
+
+async function addChild() {
+  const name = document.getElementById("new-name").value.trim();
+  const age = document.getElementById("new-age").value;
+  if(!name) return;
+  const btn = document.getElementById("add-btn");
+  btn.textContent="Kaydediliyor..."; btn.disabled=true;
+  const {data} = await sb.from("children").insert({parent_id:currentUser.id,name,age:parseInt(age),language:"tr"}).select().single();
+  btn.textContent="Profil Ekle →"; btn.disabled=false;
+  if(data){ hideAddForm(); document.getElementById("new-name").value=""; loadChildren(); }
+}
+
+async function deleteChild(id) {
+  if(!confirm("Bu profili silmek istiyor musun?")) return;
+  await sb.from("children").delete().eq("id",id);
+  loadChildren();
+}
+
+// ── CHAT ─────────────────────────────────────────────────────
+async function startChat(child) {
+  currentChild = child;
+  messages = [];
+  sessionStart = new Date();
+  show("chat");
+  document.getElementById("messages").innerHTML="";
+  document.getElementById("quick-prompts").style.display="flex";
+
+  const {data} = await sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single();
+  if(data) sessionId = data.id;
+
+  addMessage("bibi", `Merhaba ${child.name}! 👋 Ben Bibi — seninle öğrenmek için buradayım. Bugün ne hakkında konuşmak istersin? 🌟`);
+}
+
+async function goBack() {
+  if(sessionId) {
+    const mins = Math.round((new Date()-sessionStart)/60000);
+    await sb.from("sessions").update({ended_at:new Date().toISOString(),duration_mins:mins,message_count:messages.filter(m=>m.r==="user").length}).eq("id",sessionId);
+  }
+  sessionId=null; loadChildren();
+}
+
+function addMessage(role, text) {
+  messages.push({r:role,t:text});
+  const el = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.className = "msg-row " + (role==="bibi"?"bibi":"user");
+  const bubble = document.createElement("div");
+  bubble.className = role==="bibi"?"msg-bibi":"msg-user";
+  bubble.textContent = text;
+  row.appendChild(bubble);
+  if(role==="bibi") {
+    const btn = document.createElement("button");
+    btn.style.cssText="width:28px;height:28px;border-radius:50%;background:#f0f7f5;border:1.5px solid #c5e8e0;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7;align-self:flex-end";
+    btn.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="#0D9B7E"/></svg>';
+    btn.onclick=()=>speak(text);
+    row.appendChild(btn);
+  }
+  el.appendChild(row);
+  el.scrollTop=el.scrollHeight;
+  if(messages.length>2) document.getElementById("quick-prompts").style.display="none";
+}
+
+function addTyping() {
+  const el = document.getElementById("messages");
+  const row = document.createElement("div");
+  row.id="typing-row";row.className="msg-row bibi";
+  row.innerHTML='<div class="msg-bibi" style="display:flex;gap:5px;align-items:center"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
+  el.appendChild(row);el.scrollTop=el.scrollHeight;
+}
+
+function removeTyping(){const t=document.getElementById("typing-row");if(t)t.remove();}
+
+function setInput(v){document.getElementById("chat-input").value=v;}
+
+function setStatus(text,color){
+  document.getElementById("status-text").textContent=text;
+  document.getElementById("status-dot").style.background=color;
+}
+
+function buildPrompt(child){
+  const tone=child.age<=8?"Çok kısa cümleler. Bol emoji 😊":child.age<=12?"Dengeli açıklamalar.":"Akran gibi konuş.";
+  return `Sen Bibi'sin — ${child.age} yaşındaki ${child.name} için AI öğrenme arkadaşısın. Sıcak, sabırlı ve meraklısın. Asla "yanlış" demezsin. Her cevabının sonunda soru sorarsın. ${tone} Dil: Türkçe. Kısa cevaplar ver.`;
+}
+
+async function sendMessage(){
+  const inp=document.getElementById("chat-input");
+  const text=inp.value.trim(); if(!text) return;
+  inp.value="";
+  addMessage("user",text);
+  document.getElementById("send-btn").style.background="#c5e8e0";
+  setStatus("Düşünüyor...","#fbbf24");
+  addTyping();
+
+  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,language:"tr"});
+
+  try {
+    const apiMsgs = messages.filter(m=>m.r!=="bibi"||messages.indexOf(m)===0).map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}));
+    const res = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:MODEL,max_tokens:1000,system:buildPrompt(currentChild),messages:messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}))})
+    });
+    const data=await res.json();
+    const reply=data.content?.[0]?.text||"Bir sorun oluştu 🙈";
+    removeTyping();
+    addMessage("bibi",reply);
+    setStatus("Seninle burada!","#4ade80");
+    document.getElementById("send-btn").style.background="#0D9B7E";
+    speak(reply);
+    if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
+  } catch(e){
+    removeTyping();
+    addMessage("bibi","Bağlantıda sorun var 😅 Tekrar dener misin?");
+    setStatus("Seninle burada!","#4ade80");
+  }
+}
+
+// ── VOICE ─────────────────────────────────────────────────────
+function speak(text){
+  if(!voiceOn||!window.speechSynthesis) return;
+  const clean=text.replace(/[\u{1F000}-\u{1FFFF}]/gu,"").trim();
+  window.speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(clean);
+  u.lang="tr-TR";u.rate=0.92;u.pitch=1.15;
+  const vs=window.speechSynthesis.getVoices();
+  const tv=vs.find(v=>v.lang.startsWith("tr"));if(tv)u.voice=tv;
+  u.onstart=()=>setStatus("Konuşuyor...","#a78bfa");
+  u.onend=()=>setStatus("Seninle burada!","#4ade80");
+  window.speechSynthesis.speak(u);
+}
+
+function toggleVoice(){
+  voiceOn=!voiceOn;
+  const btn=document.getElementById("voice-btn");
+  btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
+  if(!voiceOn) window.speechSynthesis?.cancel();
+}
+
+function toggleMic(){
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){showMicErr("Chrome kullan! 🎙️");return;}
+  if(isListening){recognition?.stop();return;}
+  recognition=new SR();recognition.lang="tr-TR";recognition.continuous=false;recognition.interimResults=true;
+  recognition.onstart=()=>{isListening=true;setStatus("Seni dinliyorum 🎙️","#F4845F");document.getElementById("mic-btn").style.background="#F4845F";document.getElementById("chat-input").placeholder="Dinliyorum...";};
+  recognition.onresult=e=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;document.getElementById("chat-input").value=t;};
+  recognition.onend=()=>{isListening=false;setStatus("Seninle burada!","#4ade80");document.getElementById("mic-btn").style.background="#f0f7f5";document.getElementById("chat-input").placeholder="Bibi'ye yaz veya konuş...";};
+  recognition.onerror=e=>{isListening=false;showMicErr(e.error==="not-allowed"?"Mikrofon izni gerekli!":"Ses duyamadım 🎤");};
+  recognition.start();
+}
+
+function showMicErr(msg){const el=document.getElementById("mic-err");el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",3000);}
+</script>
+</body>
+</html>
