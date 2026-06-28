@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>bibi</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Nunito',sans-serif;background:#F0F7F5}
+    input,button,select{font-family:'Nunito',sans-serif}
+    input:focus{outline:none}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.08);opacity:.15}}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.025)}}
+    @keyframes wiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+    @keyframes floatUp{0%{opacity:0;transform:translateY(0) scale(.5)}60%{opacity:1}100%{opacity:0;transform:translateY(-28px) scale(1.1)}}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-thumb{background:#c5e8e0;border-radius:4px}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+// ── AYARLAR — sadece burası değişecek ─────────────────────────
+const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
+const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
+const ANTHROPIC_KEY = "YOUR_API_KEY_HERE"; // ← buraya key yapıştır
+const MODEL = "claude-sonnet-4-6";
+// ─────────────────────────────────────────────────────────────
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+const { useState, useEffect, useRef, useCallback } = React;
+
+const C = {
+  teal:"#0D9B7E", tealDark:"#0a7a63", terra:"#F4845F",
+  dark:"#1A2E2A", darkMid:"#243d38", white:"#FFFFFF",
+  offWhite:"#F8FBFA", gray:"#6B7280",
+};
+
+const TOPICS = {
+  "Matematik":["matematik","sayı","toplama","çıkarma","çarpma","bölme","kesir","geometri","denklem","yüzde","alan"],
+  "Fen":["fen","bilim","fizik","kimya","biyoloji","deney","atom","hücre","enerji","kuvvet","gezegen"],
+  "Dil":["türkçe","kelime","cümle","hikaye","şiir","okuma","dilbilgisi","ingilizce","arapça"],
+  "Tarih":["tarih","osmanlı","atatürk","savaş","medeniyet","cumhuriyet","roma"],
+};
+
+function detectTopic(t){
+  const l=t.toLowerCase();
+  for(const[k,v]of Object.entries(TOPICS)) if(v.some(w=>l.includes(w))) return k;
+  return "Genel";
+}
+
+function buildPrompt(child){
+  const tone = child.age<=8 ? "Çok kısa cümleler. Bol emoji 😊"
+    : child.age<=12 ? "Dengeli açıklamalar. Analoji kullan."
+    : "Akran gibi konuş. Az emoji, derin açıklamalar.";
+  return `Sen Bibi'sin — ${child.age} yaşındaki ${child.name} için AI öğrenme arkadaşısın.
+Kişiliğin: Sıcak, sabırlı, meraklı. Asla "yanlış" demezsin. Her cevabın sonunda soru sorarsın. ${tone}
+Dil: Türkçe. Çocuk başka dil yazarsa o dilde yanıt ver.
+Güvenlik: Kişisel bilgi sorma. Üzgün göründüğünde nazikçe yönlendir.
+Kısa ve odaklı cevaplar ver.`;
+}
+
+// ── BİBİ YÜZÜ ────────────────────────────────────────────────
+function BibiFace({expression="idle",isAnimating,isListening,isSpeaking,size=130}){
+  const [blink,setBlink]=useState(false);
+  const [mouth,setMouth]=useState(false);
+  useEffect(()=>{
+    if(expression==="happy"||expression==="thinking") return;
+    const s=()=>setTimeout(()=>{setBlink(true);setTimeout(()=>setBlink(false),150);r.c=s();},2500+Math.random()*3500);
+    const r={c:s()}; return()=>clearTimeout(r.c);
+  },[expression]);
+  useEffect(()=>{
+    if(expression!=="talking"){setMouth(false);return;}
+    const iv=setInterval(()=>setMouth(o=>!o),220); return()=>clearInterval(iv);
+  },[expression]);
+  const ac={idle:"#F4845F",happy:"#fbbf24",thinking:"#a78bfa",talking:"#34d399",listening:"#F4845F"}[expression]||"#F4845F";
+  return(
+    <div style={{position:"relative",width:size,height:size}}>
+      {isAnimating&&<div style={{position:"absolute",top:-8,left:-8,width:size+16,height:size+16,borderRadius:"50%",border:"3px solid #0D9B7E",animation:"pulse 1.2s ease-in-out infinite",opacity:.4}}/>}
+      {isSpeaking&&!isAnimating&&<><div style={{position:"absolute",top:-8,left:-8,width:size+16,height:size+16,borderRadius:"50%",border:"3px solid #a78bfa",animation:"pulse .6s ease-in-out infinite",opacity:.5}}/><div style={{position:"absolute",top:-18,left:-18,width:size+36,height:size+36,borderRadius:"50%",border:"2px solid #a78bfa",animation:"pulse .6s .18s ease-in-out infinite",opacity:.22}}/></>}
+      {isListening&&<><div style={{position:"absolute",top:-8,left:-8,width:size+16,height:size+16,borderRadius:"50%",border:"3px solid #F4845F",animation:"pulse .75s ease-in-out infinite",opacity:.6}}/><div style={{position:"absolute",top:-20,left:-20,width:size+40,height:size+40,borderRadius:"50%",border:"2px solid #F4845F",animation:"pulse .75s .2s ease-in-out infinite",opacity:.25}}/></>}
+      <svg width={size} height={size} viewBox="0 0 130 130" style={{filter:"drop-shadow(0 6px 18px rgba(13,155,126,0.28))",animation:isAnimating?"none":"breathe 3.5s ease-in-out infinite"}}>
+        <defs>
+          <radialGradient id="g1" cx="38%" cy="30%" r="65%"><stop offset="0%" stopColor="#1ecfa8"/><stop offset="100%" stopColor="#0a7a63"/></radialGradient>
+          <radialGradient id="g2" cx="35%" cy="25%" r="50%"><stop offset="0%" stopColor="white" stopOpacity=".18"/><stop offset="100%" stopColor="white" stopOpacity="0"/></radialGradient>
+        </defs>
+        <line x1="65" y1="14" x2="65" y2="30" stroke="#0a8a6e" strokeWidth="3.5" strokeLinecap="round"/>
+        <circle cx="65" cy="10" r="6" fill={ac}><animate attributeName="r" values="6;7;6" dur="1.8s" repeatCount="indefinite"/></circle>
+        <circle cx="65" cy="10" r="3" fill="white" opacity=".45"/>
+        <circle cx="65" cy="73" r="48" fill="url(#g1)"/>
+        <circle cx="65" cy="73" r="48" fill="url(#g2)"/>
+        {expression==="happy"?(<><path d="M37 64 Q47 55 57 64" stroke="white" strokeWidth="3.5" fill="none" strokeLinecap="round"/><path d="M73 64 Q83 55 93 64" stroke="white" strokeWidth="3.5" fill="none" strokeLinecap="round"/></>)
+        :expression==="thinking"?(<><circle cx="47" cy="67" r="10" fill="white"/><circle cx="49" cy="64" r="6.5" fill="#1A2E2A"/><circle cx="51" cy="62" r="2" fill="white"/><circle cx="83" cy="67" r="10" fill="white"/><circle cx="86" cy="62" r="6.5" fill="#1A2E2A"/><circle cx="88" cy="60" r="2" fill="white"/><circle cx="96" cy="52" r="2.5" fill="white" opacity=".7"><animate attributeName="opacity" values=".7;.2;.7" dur="1s" repeatCount="indefinite"/></circle><circle cx="103" cy="46" r="2" fill="white" opacity=".5"><animate attributeName="opacity" values=".5;.1;.5" dur="1s" begin=".2s" repeatCount="indefinite"/></circle></>)
+        :expression==="listening"?(<><circle cx="47" cy="67" r="12" fill="white"/><circle cx="49" cy="65" r="7.5" fill="#1A2E2A"/><circle cx="51.5" cy="62.5" r="2.5" fill="white"/><circle cx="83" cy="67" r="12" fill="white"/><circle cx="85" cy="65" r="7.5" fill="#1A2E2A"/><circle cx="87.5" cy="62.5" r="2.5" fill="white"/></>)
+        :(<><circle cx="47" cy="67" r="10" fill="white"/>{blink?<rect x="37" y="65" width="20" height="4" rx="2" fill="#0a7a63"/>:<><circle cx="49" cy="65" r="6" fill="#1A2E2A"/><circle cx="51" cy="62.5" r="2" fill="white"/></>}<circle cx="83" cy="67" r="10" fill="white"/>{blink?<rect x="73" y="65" width="20" height="4" rx="2" fill="#0a7a63"/>:<><circle cx="85" cy="65" r="6" fill="#1A2E2A"/><circle cx="87" cy="62.5" r="2" fill="white"/></>}</>)}
+        {expression!=="thinking"&&<><ellipse cx="30" cy="80" rx="11" ry="7" fill="#F4845F" opacity={expression==="happy"||expression==="listening"?.65:.38}/><ellipse cx="100" cy="80" rx="11" ry="7" fill="#F4845F" opacity={expression==="happy"||expression==="listening"?.65:.38}/></>}
+        {expression==="talking"?(mouth?<ellipse cx="65" cy="88" rx="10" ry="8" fill="#1A2E2A"/>:<ellipse cx="65" cy="88" rx="10" ry="4" fill="#1A2E2A"/>)
+        :expression==="happy"?(<path d="M44 84 Q65 100 86 84" stroke="white" strokeWidth="3.5" fill="none" strokeLinecap="round"/>)
+        :expression==="thinking"?(<path d="M52 88 Q62 94 72 88" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round"/>)
+        :expression==="listening"?(<ellipse cx="65" cy="88" rx="5" ry="4" fill="none" stroke="white" strokeWidth="2.5"/>)
+        :(<path d="M50 87 Q65 96 80 87" stroke="white" strokeWidth="2.8" fill="none" strokeLinecap="round"/>)}
+      </svg>
+    </div>
+  );
+}
+
+function Particles({active}){
+  if(!active) return null;
+  return <div style={{position:"absolute",top:0,left:0,width:"100%",height:"100%",pointerEvents:"none",overflow:"hidden"}}>
+    {["⭐","✨","🌟","💫","🎉"].map((e,i)=><div key={i} style={{position:"absolute",left:`${20+i*15}%`,bottom:"60%",fontSize:14,animation:`floatUp 1.2s ease-out ${i*.12}s forwards`}}>{e}</div>)}
+  </div>;
+}
+
+// ── GİRİŞ EKRANI ─────────────────────────────────────────────
+function AuthScreen({onAuth}){
+  const [mode,setMode]=useState("login");
+  const [email,setEmail]=useState("");
+  const [pw,setPw]=useState("");
+  const [name,setName]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+  const [ok,setOk]=useState("");
+
+  async function submit(){
+    setErr("");setOk("");
+    if(!email||!pw){setErr("E-posta ve şifre zorunlu.");return;}
+    if(mode==="register"&&!name){setErr("Adınızı girin.");return;}
+    if(pw.length<6){setErr("Şifre en az 6 karakter.");return;}
+    setLoading(true);
+    try{
+      if(mode==="register"){
+        const{data,error}=await sb.auth.signUp({email,password:pw,options:{data:{full_name:name}}});
+        if(error)throw error;
+        if(data.user){await sb.from("parents").upsert({id:data.user.id,email,full_name:name});setOk("Hesap oluşturuldu!");setTimeout(()=>onAuth(data.user),1000);}
+      }else{
+        const{data,error}=await sb.auth.signInWithPassword({email,password:pw});
+        if(error)throw error;
+        onAuth(data.user);
+      }
+    }catch(e){setErr(e.message==="Invalid login credentials"?"E-posta veya şifre hatalı.":e.message);}
+    finally{setLoading(false);}
+  }
+
+  const inp={padding:"12px 16px",borderRadius:12,border:"1.5px solid rgba(255,255,255,.2)",background:"rgba(255,255,255,.09)",color:"white",fontSize:15,width:"100%"};
+
+  return(
+    <div style={{minHeight:"100vh",background:`linear-gradient(135deg,${C.dark} 0%,${C.darkMid} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{width:"100%",maxWidth:400,animation:"fadeUp .4s ease"}}>
+        <div style={{display:"flex",flexDirection:"column",alignItems:"center",marginBottom:32,position:"relative"}}>
+          <BibiFace expression="happy" size={100}/><Particles active={true}/>
+          <div style={{color:"white",fontSize:36,fontWeight:800,marginTop:12}}>bibi</div>
+          <div style={{color:"rgba(255,255,255,.5)",fontSize:13,marginTop:4,textAlign:"center"}}>6-15 yaş çocuklar için AI öğrenme arkadaşı</div>
+        </div>
+        <div style={{background:"rgba(255,255,255,.06)",border:"1.5px solid rgba(255,255,255,.12)",borderRadius:20,padding:"28px 28px 24px"}}>
+          <div style={{display:"flex",background:"rgba(0,0,0,.2)",borderRadius:12,padding:4,marginBottom:24}}>
+            {["login","register"].map(m=>(
+              <button key={m} onClick={()=>{setMode(m);setErr("");setOk("");}} style={{flex:1,padding:"9px 0",borderRadius:9,border:"none",cursor:"pointer",fontWeight:700,fontSize:14,background:mode===m?C.teal:"transparent",color:mode===m?"white":"rgba(255,255,255,.4)",transition:"all .2s"}}>
+                {m==="login"?"Giriş Yap":"Kayıt Ol"}
+              </button>
+            ))}
+          </div>
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {mode==="register"&&<input value={name} onChange={e=>setName(e.target.value)} placeholder="Adınız Soyadınız" style={inp} onKeyDown={e=>e.key==="Enter"&&submit()}/>}
+            <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-posta adresiniz" type="email" style={inp} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+            <input value={pw} onChange={e=>setPw(e.target.value)} placeholder="Şifre (en az 6 karakter)" type="password" style={inp} onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          </div>
+          {err&&<div style={{marginTop:12,padding:"10px 14px",borderRadius:10,background:"rgba(244,132,95,.15)",border:"1px solid rgba(244,132,95,.3)",color:"#fca88a",fontSize:13}}>{err}</div>}
+          {ok&&<div style={{marginTop:12,padding:"10px 14px",borderRadius:10,background:"rgba(13,155,126,.15)",border:"1px solid rgba(13,155,126,.3)",color:"#5eead4",fontSize:13}}>{ok}</div>}
+          <button onClick={submit} disabled={loading} style={{marginTop:20,width:"100%",padding:"13px 0",borderRadius:12,border:"none",background:loading?"rgba(13,155,126,.4)":C.teal,color:"white",fontSize:16,fontWeight:800,cursor:loading?"default":"pointer"}}>
+            {loading?"Bekleyin...":mode==="login"?"Giriş Yap →":"Hesap Oluştur →"}
+          </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:20,color:"rgba(255,255,255,.25)",fontSize:12}}>Bibi · Çocuklar için güvenli AI</div>
+      </div>
+    </div>
+  );
+}
+
+// ── ÇOCUK EKRANI ─────────────────────────────────────────────
+function ChildScreen({user,onSelect,onOut}){
+  const [list,setList]=useState([]);
+  const [add,setAdd]=useState(false);
+  const [nm,setNm]=useState("");
+  const [ag,setAg]=useState("9");
+  const [loading,setLoading]=useState(true);
+  const [saving,setSaving]=useState(false);
+  useEffect(()=>{sb.from("children").select("*").order("created_at").then(({data})=>{setList(data||[]);setLoading(false);});},[]);
+  async function addChild(){if(!nm)return;setSaving(true);const{data}=await sb.from("children").insert({parent_id:user.id,name:nm,age:parseInt(ag),language:"tr"}).select().single();if(data){setList(p=>[...p,data]);setAdd(false);setNm("");setAg("9");}setSaving(false);}
+  async function del(id){if(!confirm("Bu profili silmek istiyor musun?"))return;await sb.from("children").delete().eq("id",id);setList(p=>p.filter(c=>c.id!==id));}
+  const colors=[C.teal,"#7C3AED","#F59E0B","#2563EB","#EC4899"];
+  return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 100%)",padding:"24px 16px 40px"}}>
+      <div style={{maxWidth:480,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28}}>
+          <div><div style={{fontSize:22,fontWeight:800,color:C.dark}}>Merhaba! 👋</div><div style={{fontSize:13,color:C.gray,marginTop:2}}>{user.email}</div></div>
+          <button onClick={onOut} style={{padding:"8px 16px",borderRadius:20,background:"white",border:"1.5px solid #e0f0ec",color:C.gray,fontSize:13,fontWeight:600,cursor:"pointer"}}>Çıkış</button>
+        </div>
+        <div style={{fontSize:12,fontWeight:700,color:C.teal,letterSpacing:1.5,textTransform:"uppercase",marginBottom:14}}>Kim oynayacak?</div>
+        {loading?<div style={{textAlign:"center",padding:"40px 0",color:C.gray}}>Yükleniyor...</div>:(
+          <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+            {list.map((c,i)=>(
+              <div key={c.id} onClick={()=>onSelect(c)} style={{background:"white",borderRadius:16,padding:"16px 18px",boxShadow:"0 2px 12px rgba(13,155,126,.10)",cursor:"pointer",display:"flex",alignItems:"center",gap:14,animation:"fadeUp .3s ease"}}>
+                <div style={{width:52,height:52,borderRadius:"50%",background:colors[i%colors.length],display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,color:"white",fontWeight:800,flexShrink:0}}>{c.name[0].toUpperCase()}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:17,fontWeight:800,color:C.dark}}>{c.name}</div>
+                  <div style={{fontSize:13,color:C.gray,marginTop:2}}>{c.age} yaşında · {c.total_sessions||0} oturum</div>
+                </div>
+                <button onClick={e=>{e.stopPropagation();del(c.id);}} style={{width:30,height:30,borderRadius:"50%",background:"#fff3ee",border:"1px solid #fcddd5",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center"}}>🗑️</button>
+                <div style={{fontSize:20,color:"#d1d5db"}}>›</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {add?(
+          <div style={{background:"white",borderRadius:16,padding:"20px 18px",boxShadow:"0 2px 12px rgba(13,155,126,.10)",animation:"fadeUp .2s ease"}}>
+            <div style={{fontSize:15,fontWeight:800,color:C.dark,marginBottom:14}}>Yeni Profil Ekle</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <input value={nm} onChange={e=>setNm(e.target.value)} placeholder="Çocuğun adı" style={{padding:"11px 14px",borderRadius:10,border:"1.5px solid #e0f0ec",fontSize:15,color:C.dark}}/>
+              <select value={ag} onChange={e=>setAg(e.target.value)} style={{padding:"11px 14px",borderRadius:10,border:"1.5px solid #e0f0ec",fontSize:15,color:C.dark,background:"white"}}>
+                {Array.from({length:12},(_,i)=>i+4).map(a=><option key={a} value={a}>{a} yaş</option>)}
+              </select>
+            </div>
+            <div style={{display:"flex",gap:10,marginTop:14}}>
+              <button onClick={()=>setAdd(false)} style={{flex:1,padding:"11px 0",borderRadius:10,border:"1.5px solid #e0f0ec",background:"white",color:C.gray,fontWeight:700,fontSize:14,cursor:"pointer"}}>İptal</button>
+              <button onClick={addChild} disabled={saving||!nm} style={{flex:2,padding:"11px 0",borderRadius:10,border:"none",background:nm&&!saving?C.teal:"#c5e8e0",color:"white",fontWeight:800,fontSize:14,cursor:nm&&!saving?"pointer":"default"}}>{saving?"Kaydediliyor...":"Profil Ekle →"}</button>
+            </div>
+          </div>
+        ):(
+          <button onClick={()=>setAdd(true)} style={{width:"100%",padding:"14px 0",borderRadius:16,border:"2px dashed #c5e8e0",background:"transparent",color:C.teal,fontSize:15,fontWeight:700,cursor:"pointer"}}>+ Yeni Profil Ekle</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── SOHBET EKRANI ─────────────────────────────────────────────
+function ChatScreen({child,user,onBack}){
+  const [msgs,setMsgs]=useState([{role:"assistant",content:`Merhaba ${child.name}! 👋 Ben Bibi — seninle öğrenmek için buradayım. Bugün ne hakkında konuşmak istersin? 🌟`,time:new Date()}]);
+  const [inp,setInp]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [expr,setExpr]=useState("idle");
+  const [listening,setListening]=useState(false);
+  const [speaking,setSpeaking]=useState(false);
+  const [voice,setVoice]=useState(true);
+  const [micErr,setMicErr]=useState("");
+  const [topics,setTopics]=useState({});
+  const [sid,setSid]=useState(null);
+  const [start]=useState(new Date());
+  const recRef=useRef(null);
+  const botRef=useRef(null);
+  const inpRef=useRef(null);
+
+  useEffect(()=>{
+    sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{if(data)setSid(data.id);});
+    return()=>endSess();
+  },[]);
+
+  async function endSess(){
+    if(!sid)return;
+    const m=Math.round((new Date()-start)/60000);
+    await sb.from("sessions").update({ended_at:new Date()
