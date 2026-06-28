@@ -180,8 +180,8 @@
 <script>
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
-const ANTHROPIC_KEY = "YOUR_API_KEY_HERE";
-const MODEL = "claude-sonnet-4-6";
+const GEMINI_KEY = "AIzaSyAQ.Ab8RN6JRSdDjeIszGrtoinFww4wWkdQPj1r0S5Wj1n2gbLL6PQ";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -403,13 +403,22 @@ async function sendMessage(){
 
   try {
     const apiMsgs = messages.filter(m=>m.r!=="bibi"||messages.indexOf(m)===0).map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}));
-    const res = await fetch("https://api.anthropic.com/v1/messages",{
+    // Gemini API formatı
+    const geminiMsgs = messages.map(m=>({
+      role: m.r==="bibi" ? "model" : "user",
+      parts: [{text: m.t}]
+    }));
+    const res = await fetch(GEMINI_URL, {
       method:"POST",
-      headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-      body:JSON.stringify({model:MODEL,max_tokens:1000,system:buildPrompt(currentChild),messages:messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}))})
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        system_instruction:{parts:[{text:buildPrompt(currentChild)}]},
+        contents: geminiMsgs,
+        generationConfig:{maxOutputTokens:1000,temperature:0.9}
+      })
     });
     const data=await res.json();
-    const reply=data.content?.[0]?.text||"Bir sorun oluştu 🙈";
+    const reply=data.candidates?.[0]?.content?.parts?.[0]?.text||"Bir sorun oluştu 🙈";
     removeTyping();
     addMessage("bibi",reply);
     setStatus("Seninle burada!","#4ade80");
