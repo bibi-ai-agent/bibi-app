@@ -208,9 +208,14 @@ function show(id) {
 // ── INIT ─────────────────────────────────────────────────────
 window.onload = async () => {
   show("loading");
-  const { data: { session } } = await sb.auth.getSession();
-  if (session?.user) { currentUser = session.user; loadChildren(); }
-  else show("auth");
+  // 4 saniye timeout — takılırsa auth ekranına geç
+  const t = setTimeout(() => show("auth"), 4000);
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    clearTimeout(t);
+    if (session?.user) { currentUser = session.user; loadChildren(); }
+    else show("auth");
+  } catch(e) { clearTimeout(t); show("auth"); }
 
   sb.auth.onAuthStateChange((_, session) => {
     if (session?.user) { currentUser = session.user; loadChildren(); }
@@ -282,10 +287,4 @@ async function loadChildren() {
   renderChildren(data||[]);
 }
 
-function renderChildren(list) {
-  const el = document.getElementById("children-list");
-  el.innerHTML = "";
-  list.forEach((c,i) => {
-    const d = document.createElement("div");
-    d.className = "card";
-    d
+function renderChildren(l
