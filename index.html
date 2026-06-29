@@ -491,7 +491,7 @@ async function doLogin(){
   const {data,error} = await sb.auth.signInWithPassword({email,password:pw});
   el("login-btn").textContent = "Giriş Yap →"; el("login-btn").disabled=false;
   if(error){ showMsg("login-msg", error.message==="Invalid login credentials"?"E-posta veya şifre hatalı.":error.message,"err"); return; }
-  currentUser=data.user; screenChildren();
+  currentUser=data.user; await checkProfileAndRoute();
 }
 
 async function doLoginPhone(){
@@ -510,7 +510,7 @@ async function verifyOTP(){
   const token = el("l-otp")?.value.trim();
   const {data,error} = await sb.auth.verifyOtp({phone, token, type:"sms"});
   if(error){ showMsg("login-msg","Kod hatalı.","err"); return; }
-  currentUser=data.user; screenChildren();
+  currentUser=data.user; await checkProfileAndRoute();
 }
 
 async function regStep1Next(){
@@ -580,6 +580,64 @@ async function regComplete(){
 // ══════════════════════════════════════════════════════════════
 // SCREEN: CHILDREN
 // ══════════════════════════════════════════════════════════════
+// ── Profile check after login ─────────────────────────────────
+async function checkProfileAndRoute(){
+  const {data:parent} = await sb.from("parents").select("*").eq("id",currentUser.id).single();
+  if(!parent || !parent.role || !parent.full_name){
+    screenCompleteProfile(parent);
+  } else {
+    screenChildren();
+  }
+}
+
+// ── Complete profile screen (for existing users) ──────────────
+function screenCompleteProfile(existing){
+  render(`
+  <div style="width:100%;min-height:100vh;background:linear-gradient(135deg,#1A2E2A 0%,#243d38 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:20px">
+    ${floatingBibis(6,["#0D9B7E"])}
+    <div style="width:100%;max-width:400px;position:relative;z-index:10;animation:fadeUp .5s ease">
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:24px">
+        <div style="animation:bounce 2s ease-in-out infinite">${bibiFaceSVG("happy",80)}</div>
+        <div style="color:white;font-size:22px;font-weight:900;margin-top:10px">Profilinizi Tamamlayın</div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:6px;text-align:center">Bibi'yi kişiselleştirmek için birkaç bilgi daha lazım 🌟</div>
+      </div>
+      <div style="background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;padding:24px;display:flex;flex-direction:column;gap:12px">
+        <input class="inp-dark" id="cp-name" placeholder="Adınız Soyadınız" value="${existing?.full_name||''}"/>
+        <select class="inp-dark" id="cp-role" style="cursor:pointer">
+          <option value="">Çocukla ilişkiniz</option>
+          ${["anne","baba","abi","abla","anneanne","babaanne","dede","diger"].map(r=>`<option value="${r}" ${existing?.role===r?"selected":""}>${r.charAt(0).toUpperCase()+r.slice(1)}</option>`).join("")}
+        </select>
+        <select class="inp-dark" id="cp-age" style="cursor:pointer">
+          <option value="">Yaş aralığınız</option>
+          ${["18-25","26-35","36-45","46-55","55+"].map(a=>`<option value="${a}" ${existing?.age_range===a?"selected":""}>${a}</option>`).join("")}
+        </select>
+        <select class="inp-dark" id="cp-edu" style="cursor:pointer">
+          <option value="">Öğrenim durumunuz</option>
+          ${[["ilkokul","İlkokul"],["ortaokul","Ortaokul"],["lise","Lise"],["onlisans","Ön Lisans"],["lisans","Lisans"],["yukseklisans","Yüksek Lisans / Doktora"]].map(([v,l])=>`<option value="${v}" ${existing?.education===v?"selected":""}>${l}</option>`).join("")}
+        </select>
+        <input class="inp-dark" id="cp-job" placeholder="Mesleğiniz (isteğe bağlı)" value="${existing?.job||''}"/>
+        <div id="cp-msg" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
+        <button onclick="saveCompleteProfile()" class="btn-primary">Kaydet ve Devam Et →</button>
+        <button onclick="screenChildren()" style="background:transparent;border:none;color:rgba(255,255,255,.4);font-size:13px;cursor:pointer;padding:6px">Şimdi atla →</button>
+      </div>
+    </div>
+  </div>`);
+}
+
+async function saveCompleteProfile(){
+  const name=el("cp-name")?.value.trim(), role=el("cp-role")?.value;
+  const age=el("cp-age")?.value, edu=el("cp-edu")?.value, job=el("cp-job")?.value.trim();
+  if(!name||!role||!age||!edu){ showMsg("cp-msg","Lütfen zorunlu alanları doldurun.","err"); return; }
+  const btn=document.querySelector('[onclick="saveCompleteProfile()"]');
+  if(btn){ btn.textContent="Kaydediliyor..."; btn.disabled=true; }
+  const {error} = await sb.from("parents").upsert({
+    id:currentUser.id, email:currentUser.email||null,
+    full_name:name, role, age_range:age, education:edu, job:job||""
+  });
+  if(error){ showMsg("cp-msg","Hata: "+error.message,"err"); if(btn){btn.textContent="Kaydet ve Devam Et →";btn.disabled=false;} return; }
+  screenChildren();
+}
+
 async function screenChildren(){
   const {data:list=[]} = await sb.from("children").select("*").order("created_at");
   const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
@@ -869,7 +927,7 @@ window.onload = async () => {
     else screenAuth();
   } catch(e){ clearTimeout(t); screenAuth(); }
   sb.auth.onAuthStateChange((_,session)=>{
-    if(session?.user){ currentUser=session.user; if(!currentChild) screenChildren(); }
+    if(session?.user){ currentUser=session.user; if(!currentChild) await checkProfileAndRoute(); }
     else{ currentUser=null; screenAuth(); }
   });
 };
