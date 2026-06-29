@@ -927,7 +927,7 @@ window.onload = async () => {
     else screenAuth();
   } catch(e){ clearTimeout(t); screenAuth(); }
   sb.auth.onAuthStateChange((_,session)=>{
-    if(session?.user){ currentUser=session.user; if(!currentChild) await checkProfileAndRoute(); }
+    if(session?.user){ currentUser=session.user; if(!currentChild) checkProfileAndRoute(); }
     else{ currentUser=null; screenAuth(); }
   });
 };
