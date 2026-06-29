@@ -4,180 +4,72 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>bibi</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Nunito',sans-serif;background:#1A2E2A;display:flex;align-items:center;justify-content:center;min-height:100vh}
-    #app{width:100%;max-width:420px;min-height:100vh;background:#F8FBFA;display:flex;flex-direction:column}
-    .hidden{display:none!important}
-    @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes pulse{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.08);opacity:.15}}
-    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .dot{width:8px;height:8px;border-radius:50%;background:#0D9B7E;display:inline-block;animation:bounce 1s ease infinite}
-    .dot:nth-child(2){animation-delay:.15s}
-    .dot:nth-child(3){animation-delay:.3s}
-    input:focus{outline:none}
+    body{font-family:'Nunito',sans-serif;background:#1A2E2A;min-height:100vh}
+    input,button,select{font-family:'Nunito',sans-serif}
+    input:focus,select:focus{outline:none}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-thumb{background:#c5e8e0;border-radius:4px}
-    .msg-bibi{background:white;border-radius:4px 18px 18px 18px;padding:12px 16px;max-width:75%;font-size:15px;line-height:1.55;box-shadow:0 2px 12px rgba(13,155,126,.10);color:#1A2E2A}
-    .msg-user{background:#0D9B7E;border-radius:18px 4px 18px 18px;padding:12px 16px;max-width:75%;font-size:15px;line-height:1.55;color:white;font-weight:600}
-    .msg-row{display:flex;margin-bottom:12px;animation:fadeUp .3s ease}
+    .hidden{display:none!important}
+
+    /* ── Animations ── */
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    @keyframes floatBibi{0%,100%{transform:translateY(0) rotate(-3deg) scale(1)}50%{transform:translateY(-18px) rotate(3deg) scale(1.04)}}
+    @keyframes floatBibi2{0%,100%{transform:translateY(0) rotate(2deg) scale(0.95)}50%{transform:translateY(-12px) rotate(-4deg) scale(1)}}
+    @keyframes floatBibi3{0%,100%{transform:translateY(-8px) rotate(-2deg)}50%{transform:translateY(8px) rotate(4deg)}}
+    @keyframes pulse{0%,100%{transform:scale(1);opacity:.5}50%{transform:scale(1.1);opacity:.2}}
+    @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+    @keyframes blink{0%,88%,100%{scaleY:1}94%{scaleY:0.05}}
+    @keyframes eyeMove{0%,100%{transform:translate(0,0)}25%{transform:translate(2px,-1px)}50%{transform:translate(-2px,1px)}75%{transform:translate(1px,2px)}}
+    @keyframes smile{from{d:path('M50 87 Q65 96 80 87')}to{d:path('M44 84 Q65 102 86 84')}}
+    @keyframes wiggle{0%,100%{transform:rotate(0)}20%{transform:rotate(-5deg)}40%{transform:rotate(5deg)}60%{transform:rotate(-3deg)}80%{transform:rotate(3deg)}}
+    @keyframes thinkBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+    @keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+    @keyframes dotPulse{0%,80%,100%{transform:scale(0.6);opacity:.3}40%{transform:scale(1);opacity:1}}
+    @keyframes floatUp{0%{opacity:0;transform:translateY(0) scale(.5)}60%{opacity:1}100%{opacity:0;transform:translateY(-30px) scale(1.2)}}
+    @keyframes gradShift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    @keyframes starTwinkle{0%,100%{opacity:.2;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
+    /* ── Buttons ── */
+    .btn-primary{width:100%;padding:14px;border-radius:14px;border:none;background:#0D9B7E;color:white;font-size:16px;font-weight:800;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+    .btn-primary:hover{background:#0b8870;transform:translateY(-1px);box-shadow:0 4px 16px rgba(13,155,126,.35)}
+    .btn-primary:active{transform:translateY(0)}
+    .btn-primary:disabled{background:#c5e8e0;cursor:default;transform:none;box-shadow:none}
+    .btn-secondary{padding:11px 0;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer}
+    .inp-dark{padding:13px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.09);color:white;font-size:15px;width:100%}
+    .inp-dark::placeholder{color:rgba(255,255,255,.4)}
+    .inp-light{padding:12px 14px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;font-size:15px;color:#1A2E2A;width:100%}
+    .inp-light:focus{border-color:#0D9B7E}
+    select.inp-light{cursor:pointer}
+
+    /* ── Chat bubbles ── */
+    .msg-bibi{background:white;border-radius:4px 18px 18px 18px;padding:12px 16px;max-width:75%;font-size:15px;line-height:1.6;box-shadow:0 2px 12px rgba(0,0,0,.08);color:#1A2E2A}
+    .msg-user{border-radius:18px 4px 18px 18px;padding:12px 16px;max-width:75%;font-size:15px;line-height:1.6;color:white;font-weight:600}
+    .msg-row{display:flex;margin-bottom:12px;animation:fadeUp .3s ease;gap:6px;align-items:flex-end}
     .msg-row.user{justify-content:flex-end}
     .msg-row.bibi{justify-content:flex-start}
-    button{cursor:pointer;font-family:'Nunito',sans-serif}
-    .chip{background:white;border:1.5px solid #c5e8e0;border-radius:20px;padding:6px 12px;font-size:12px;color:#0D9B7E;font-weight:600}
-    .tab{flex:1;padding:9px 0;border-radius:9px;border:none;font-weight:700;font-size:14px;transition:all .2s}
-    .inp{padding:12px 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);color:white;font-size:15px;width:100%;font-family:'Nunito',sans-serif}
-    .inp::placeholder{color:rgba(255,255,255,.45)}
-    .card{background:white;border-radius:16px;padding:16px 18px;box-shadow:0 2px 12px rgba(13,155,126,.10);cursor:pointer;display:flex;align-items:center;gap:14px;margin-bottom:12px;animation:fadeUp .3s ease}
+    .chip{border-radius:20px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:white}
+    .chip:hover{background:rgba(255,255,255,.25)}
+
+    /* ── Step indicator ── */
+    .step-dot{width:8px;height:8px;border-radius:50%;transition:all .3s}
+
+    /* ── Background Bibis ── */
+    .bg-bibi{position:absolute;opacity:.07;pointer-events:none;user-select:none}
   </style>
 </head>
 <body>
-<div id="app">
-  <!-- LOADING -->
-  <div id="screen-loading" style="display:flex;align-items:center;justify-content:center;flex:1;flex-direction:column;gap:16px;background:#1A2E2A">
-    <svg width="80" height="80" viewBox="0 0 130 130">
-      <defs><radialGradient id="g" cx="38%" cy="30%" r="65%"><stop offset="0%" stop-color="#1ecfa8"/><stop offset="100%" stop-color="#0a7a63"/></radialGradient></defs>
-      <circle cx="65" cy="10" r="6" fill="#F4845F"/>
-      <line x1="65" y1="16" x2="65" y2="30" stroke="#0a8a6e" stroke-width="3.5" stroke-linecap="round"/>
-      <circle cx="65" cy="73" r="48" fill="url(#g)"/>
-      <circle cx="47" cy="67" r="10" fill="white"/><circle cx="49" cy="65" r="6" fill="#1A2E2A"/><circle cx="51" cy="62.5" r="2" fill="white"/>
-      <circle cx="83" cy="67" r="10" fill="white"/><circle cx="85" cy="65" r="6" fill="#1A2E2A"/><circle cx="87" cy="62.5" r="2" fill="white"/>
-      <ellipse cx="30" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".4"/>
-      <ellipse cx="100" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".4"/>
-      <path d="M50 87 Q65 96 80 87" stroke="white" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-    </svg>
-    <div style="color:rgba(255,255,255,.5);font-size:14px">Yükleniyor...</div>
-  </div>
-
-  <!-- AUTH -->
-  <div id="screen-auth" class="hidden" style="flex:1;background:linear-gradient(135deg,#1A2E2A 0%,#243d38 100%);display:flex;align-items:center;justify-content:center;padding:16px">
-    <div style="width:100%;max-width:380px;animation:fadeUp .4s ease">
-      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px">
-        <svg width="90" height="90" viewBox="0 0 130 130" style="filter:drop-shadow(0 6px 18px rgba(13,155,126,0.35))">
-          <defs><radialGradient id="g2" cx="38%" cy="30%" r="65%"><stop offset="0%" stop-color="#1ecfa8"/><stop offset="100%" stop-color="#0a7a63"/></radialGradient></defs>
-          <circle cx="65" cy="10" r="6" fill="#fbbf24"/>
-          <line x1="65" y1="16" x2="65" y2="30" stroke="#0a8a6e" stroke-width="3.5" stroke-linecap="round"/>
-          <circle cx="65" cy="73" r="48" fill="url(#g2)"/>
-          <path d="M37 64 Q47 55 57 64" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          <path d="M73 64 Q83 55 93 64" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          <ellipse cx="30" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".6"/>
-          <ellipse cx="100" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".6"/>
-          <path d="M44 84 Q65 100 86 84" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-        </svg>
-        <div style="color:white;font-size:34px;font-weight:800;margin-top:10px">bibi</div>
-        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px;text-align:center">6-15 yaş çocuklar için AI öğrenme arkadaşı</div>
-      </div>
-      <div style="background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);border-radius:20px;padding:24px">
-        <div style="display:flex;background:rgba(0,0,0,.2);border-radius:12px;padding:4px;margin-bottom:20px">
-          <button class="tab" id="tab-login" onclick="switchTab('login')" style="background:#0D9B7E;color:white">Giriş Yap</button>
-          <button class="tab" id="tab-register" onclick="switchTab('register')" style="background:transparent;color:rgba(255,255,255,.4)">Kayıt Ol</button>
-        </div>
-        <div id="field-name" class="hidden" style="margin-bottom:10px">
-          <input class="inp" id="inp-name" placeholder="Adınız Soyadınız" onkeydown="if(event.key==='Enter')doAuth()"/>
-        </div>
-        <div style="margin-bottom:10px">
-          <input class="inp" id="inp-email" type="email" placeholder="E-posta adresiniz" onkeydown="if(event.key==='Enter')doAuth()"/>
-        </div>
-        <div style="margin-bottom:16px">
-          <input class="inp" id="inp-pw" type="password" placeholder="Şifre (en az 6 karakter)" onkeydown="if(event.key==='Enter')doAuth()"/>
-        </div>
-        <div id="auth-msg" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:12px"></div>
-        <button onclick="doAuth()" id="auth-btn" style="width:100%;padding:13px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-size:16px;font-weight:800">Giriş Yap →</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- CHILDREN -->
-  <div id="screen-children" class="hidden" style="flex:1;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 100%);padding:24px 16px 40px;overflow-y:auto">
-    <div style="max-width:480px;margin:0 auto">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
-        <div>
-          <div style="font-size:22px;font-weight:800;color:#1A2E2A">Merhaba! 👋</div>
-          <div id="user-email" style="font-size:13px;color:#6B7280;margin-top:2px"></div>
-        </div>
-        <button onclick="signOut()" style="padding:8px 16px;border-radius:20px;background:white;border:1.5px solid #e0f0ec;color:#6B7280;font-size:13px;font-weight:600">Çıkış</button>
-      </div>
-      <div style="font-size:12px;font-weight:700;color:#0D9B7E;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">Kim oynayacak?</div>
-      <div id="children-list"></div>
-      <div id="add-form" class="hidden" style="background:white;border-radius:16px;padding:20px;box-shadow:0 2px 12px rgba(13,155,126,.10);margin-bottom:12px">
-        <div style="font-size:15px;font-weight:800;color:#1A2E2A;margin-bottom:14px">Yeni Profil Ekle</div>
-        <input id="new-name" placeholder="Çocuğun adı" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid #e0f0ec;font-size:15px;color:#1A2E2A;font-family:'Nunito',sans-serif;margin-bottom:10px"/>
-        <select id="new-age" style="width:100%;padding:11px 14px;border-radius:10px;border:1.5px solid #e0f0ec;font-size:15px;color:#1A2E2A;background:white;font-family:'Nunito',sans-serif;margin-bottom:14px">
-          <option value="6">6 yaş</option><option value="7">7 yaş</option><option value="8">8 yaş</option>
-          <option value="9" selected>9 yaş</option><option value="10">10 yaş</option><option value="11">11 yaş</option>
-          <option value="12">12 yaş</option><option value="13">13 yaş</option><option value="14">14 yaş</option><option value="15">15 yaş</option>
-        </select>
-        <div style="display:flex;gap:10px">
-          <button onclick="hideAddForm()" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px">İptal</button>
-          <button onclick="addChild()" id="add-btn" style="flex:2;padding:11px;border-radius:10px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:14px">Profil Ekle →</button>
-        </div>
-      </div>
-      <button id="show-add-btn" onclick="showAddForm()" style="width:100%;padding:14px;border-radius:16px;border:2px dashed #c5e8e0;background:transparent;color:#0D9B7E;font-size:15px;font-weight:700">+ Yeni Profil Ekle</button>
-    </div>
-  </div>
-
-  <!-- CHAT -->
-  <div id="screen-chat" class="hidden" style="flex:1;display:flex;flex-direction:column;height:100vh">
-    <!-- Chat header -->
-    <div id="chat-header" style="background:linear-gradient(135deg,#0D9B7E 0%,#0a7a63 100%);padding:18px 16px 22px;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative">
-      <button onclick="goBack()" style="position:absolute;top:14px;left:14px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <button onclick="toggleVoice()" id="voice-btn" style="position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-      </button>
-      <svg id="bibi-face" width="100" height="100" viewBox="0 0 130 130" style="filter:drop-shadow(0 4px 12px rgba(0,0,0,0.2))">
-        <defs><radialGradient id="gf" cx="38%" cy="30%" r="65%"><stop offset="0%" stop-color="#1ecfa8"/><stop offset="100%" stop-color="#0a7a63"/></radialGradient></defs>
-        <circle cx="65" cy="10" r="6" fill="#F4845F" id="antenna"/>
-        <line x1="65" y1="16" x2="65" y2="30" stroke="#0a8a6e" stroke-width="3.5" stroke-linecap="round"/>
-        <circle cx="65" cy="73" r="48" fill="url(#gf)"/>
-        <circle cx="47" cy="67" r="10" fill="white" id="eye-l-bg"/>
-        <circle cx="49" cy="65" r="6" fill="#1A2E2A" id="eye-l"/>
-        <circle cx="51" cy="62.5" r="2" fill="white" id="eye-l-shine"/>
-        <circle cx="83" cy="67" r="10" fill="white" id="eye-r-bg"/>
-        <circle cx="85" cy="65" r="6" fill="#1A2E2A" id="eye-r"/>
-        <circle cx="87" cy="62.5" r="2" fill="white" id="eye-r-shine"/>
-        <ellipse cx="30" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".4" id="cheek-l"/>
-        <ellipse cx="100" cy="80" rx="11" ry="7" fill="#F4845F" opacity=".4" id="cheek-r"/>
-        <path d="M50 87 Q65 96 80 87" stroke="white" stroke-width="2.8" fill="none" stroke-linecap="round" id="mouth"/>
-      </svg>
-      <div style="text-align:center">
-        <div style="color:white;font-size:18px;font-weight:800">bibi</div>
-        <div id="chat-status" style="color:rgba(255,255,255,.6);font-size:11px;margin-top:2px;display:flex;align-items:center;gap:4px;justify-content:center">
-          <span id="status-dot" style="width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block"></span>
-          <span id="status-text">Seninle burada!</span>
-        </div>
-      </div>
-    </div>
-    <!-- Messages -->
-    <div id="messages" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column"></div>
-    <!-- Quick prompts -->
-    <div id="quick-prompts" style="padding:0 16px 8px;display:flex;gap:6px;flex-wrap:wrap">
-      <button class="chip" onclick="setInput('Matematik ödev yardımı 📐')">Matematik ödev 📐</button>
-      <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü neden mavi? 🌤️</button>
-      <button class="chip" onclick="setInput('Hikaye anlat 📖')">Hikaye anlat 📖</button>
-      <button class="chip" onclick="setInput('Yeni kelime öğret 🔤')">Kelime öğret 🔤</button>
-    </div>
-    <!-- Input -->
-    <div style="padding:12px 16px 16px;border-top:1.5px solid #e8f3f0;background:white">
-      <div id="mic-err" style="display:none;background:#fff3ee;border:1px solid #f4845f55;border-radius:10px;padding:7px 12px;font-size:12px;color:#c0552a;font-weight:600;margin-bottom:8px;text-align:center"></div>
-      <div style="display:flex;gap:8px;align-items:center">
-        <button id="mic-btn" onclick="toggleMic()" style="width:44px;height:44px;border-radius:50%;background:#f0f7f5;border:1.5px solid #c5e8e0;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" fill="#0D9B7E"/><path d="M5 11a7 7 0 0 0 14 0" stroke="#0D9B7E" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="#0D9B7E" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="22" x2="15" y2="22" stroke="#0D9B7E" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-        <input id="chat-input" placeholder="Bibi'ye yaz veya konuş..." style="flex:1;padding:11px 16px;border-radius:24px;border:1.5px solid #e0f0ec;background:#F8FBFA;font-size:15px;color:#1A2E2A;font-family:'Nunito',sans-serif" onkeydown="if(event.key==='Enter')sendMessage()"/>
-        <button id="send-btn" onclick="sendMessage()" style="width:44px;height:44px;border-radius:50%;background:#c5e8e0;border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+<div id="root" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
@@ -185,257 +77,750 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-let currentUser = null;
-let currentChild = null;
-let sessionId = null;
-let sessionStart = null;
-let messages = [];
-let voiceOn = true;
-let isListening = false;
-let recognition = null;
-let authMode = "login";
-const avatarColors = ["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let currentUser = null, currentChild = null, sessionId = null;
+let sessionStart = null, messages = [], voiceOn = true;
+let isListening = false, recognition = null;
 
-// ── SCREENS ──────────────────────────────────────────────────
-function show(id) {
-  ["loading","auth","children","chat"].forEach(s => {
-    const el = document.getElementById("screen-"+s);
-    if(el) el.classList.toggle("hidden", s !== id);
-    if(el) el.style.display = s === id ? "flex" : "none";
-  });
+// ══════════════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════════════
+const R = document.getElementById("root");
+function render(html){ R.innerHTML = html; }
+
+function el(id){ return document.getElementById(id); }
+
+function showMsg(id, msg, type){
+  const e = el(id); if(!e) return;
+  e.style.display = msg ? "block" : "none";
+  e.style.background = type==="ok" ? "rgba(13,155,126,.15)" : "rgba(244,132,95,.15)";
+  e.style.border = type==="ok" ? "1px solid rgba(13,155,126,.35)" : "1px solid rgba(244,132,95,.35)";
+  e.style.color = type==="ok" ? "#5eead4" : "#fca88a";
+  e.textContent = msg;
 }
 
-// ── INIT ─────────────────────────────────────────────────────
-window.onload = async () => {
-  show("loading");
-  // 4 saniye timeout — takılırsa auth ekranına geç
-  const t = setTimeout(() => show("auth"), 4000);
-  try {
-    const { data: { session } } = await sb.auth.getSession();
-    clearTimeout(t);
-    if (session?.user) { currentUser = session.user; loadChildren(); }
-    else show("auth");
-  } catch(e) { clearTimeout(t); show("auth"); }
+// ══════════════════════════════════════════════════════════════
+// BACKGROUND BIBIS (floating)
+// ══════════════════════════════════════════════════════════════
+function bgBibiSVG(size, color="#0D9B7E"){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 130 130">
+    <circle cx="65" cy="10" r="6" fill="${color}" opacity=".6"/>
+    <line x1="65" y1="16" x2="65" y2="30" stroke="${color}" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="65" cy="73" r="48" fill="${color}"/>
+    <circle cx="47" cy="67" r="10" fill="white" opacity=".9"/>
+    <circle cx="83" cy="67" r="10" fill="white" opacity=".9"/>
+    <path d="M50 87 Q65 96 80 87" stroke="white" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
 
-  sb.auth.onAuthStateChange((_, session) => {
-    if (session?.user) { currentUser = session.user; loadChildren(); }
-    else { currentUser = null; show("auth"); }
-  });
+function floatingBibis(count=6, colors=["#0D9B7E"]){
+  const anims = ["floatBibi","floatBibi2","floatBibi3"];
+  let html = "";
+  for(let i=0;i<count;i++){
+    const size = 60 + Math.random()*80;
+    const x = Math.random()*90;
+    const y = Math.random()*90;
+    const anim = anims[i%3];
+    const dur = 4 + Math.random()*4;
+    const delay = Math.random()*3;
+    const color = colors[i%colors.length];
+    html += `<div class="bg-bibi" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px;animation:${anim} ${dur}s ${delay}s ease-in-out infinite">${bgBibiSVG(size,color)}</div>`;
+  }
+  return html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// BIBI FACE SVG (animated)
+// ══════════════════════════════════════════════════════════════
+function bibiFaceSVG(expression="idle", size=110){
+  const antenColors = {idle:"#F4845F",happy:"#fbbf24",thinking:"#a78bfa",talking:"#34d399",listening:"#F4845F"};
+  const ac = antenColors[expression]||"#F4845F";
+
+  const eyes = {
+    idle: `
+      <circle cx="47" cy="67" r="10" fill="white"/>
+      <circle cx="49" cy="65" r="6" fill="#1A2E2A" style="animation:eyeMove 3s ease-in-out infinite"/>
+      <circle cx="51" cy="62.5" r="2" fill="white"/>
+      <circle cx="83" cy="67" r="10" fill="white"/>
+      <circle cx="85" cy="65" r="6" fill="#1A2E2A" style="animation:eyeMove 3s ease-in-out infinite .5s"/>
+      <circle cx="87" cy="62.5" r="2" fill="white"/>`,
+    happy: `
+      <path d="M37 64 Q47 54 57 64" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <path d="M73 64 Q83 54 93 64" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+      <circle cx="40" cy="58" r="2" fill="#fbbf24" opacity=".9"/>
+      <circle cx="92" cy="58" r="2" fill="#fbbf24" opacity=".9"/>`,
+    thinking: `
+      <circle cx="47" cy="67" r="10" fill="white"/>
+      <circle cx="50" cy="63" r="6.5" fill="#1A2E2A" style="animation:eyeMove 1.2s ease-in-out infinite"/>
+      <circle cx="52" cy="61" r="2" fill="white"/>
+      <circle cx="83" cy="67" r="10" fill="white"/>
+      <circle cx="87" cy="61" r="6.5" fill="#1A2E2A"/>
+      <circle cx="89" cy="59" r="2" fill="white"/>
+      <circle cx="98" cy="50" r="3" fill="white" opacity=".8"><animate attributeName="opacity" values=".8;.2;.8" dur=".8s" repeatCount="indefinite"/></circle>
+      <circle cx="106" cy="43" r="2.5" fill="white" opacity=".6"><animate attributeName="opacity" values=".6;.1;.6" dur=".8s" begin=".2s" repeatCount="indefinite"/></circle>
+      <circle cx="112" cy="37" r="2" fill="white" opacity=".4"><animate attributeName="opacity" values=".4;.05;.4" dur=".8s" begin=".4s" repeatCount="indefinite"/></circle>`,
+    listening: `
+      <circle cx="47" cy="67" r="12" fill="white"/>
+      <circle cx="49" cy="65" r="7.5" fill="#1A2E2A"/>
+      <circle cx="51.5" cy="62.5" r="2.5" fill="white"/>
+      <circle cx="83" cy="67" r="12" fill="white"/>
+      <circle cx="85" cy="65" r="7.5" fill="#1A2E2A"/>
+      <circle cx="87.5" cy="62.5" r="2.5" fill="white"/>`,
+    talking: `
+      <circle cx="47" cy="67" r="10" fill="white"/>
+      <circle cx="49" cy="65" r="6" fill="#1A2E2A" style="animation:eyeMove 2s ease-in-out infinite"/>
+      <circle cx="51" cy="62.5" r="2" fill="white"/>
+      <circle cx="83" cy="67" r="10" fill="white"/>
+      <circle cx="85" cy="65" r="6" fill="#1A2E2A" style="animation:eyeMove 2s ease-in-out infinite .3s"/>
+      <circle cx="87" cy="62.5" r="2" fill="white"/>`,
+  };
+
+  const mouths = {
+    idle: `<path d="M50 87 Q65 96 80 87" stroke="white" stroke-width="2.8" fill="none" stroke-linecap="round"/>`,
+    happy: `<path d="M42 83 Q65 104 88 83" stroke="white" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <path d="M42 83 Q65 104 88 83 L88 88 Q65 96 42 88 Z" fill="white" opacity=".15"/>`,
+    thinking: `<path d="M52 88 Q62 94 72 88" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>`,
+    listening: `<ellipse cx="65" cy="88" rx="5" ry="4" fill="none" stroke="white" stroke-width="2.5"/>`,
+    talking: `<ellipse cx="65" cy="88" rx="10" ry="8" fill="#1A2E2A" id="mouth-open"/>`,
+  };
+
+  const cheekOpacity = expression==="happy"||expression==="listening" ? .65 : expression==="thinking" ? 0 : .4;
+  const bodyAnim = expression==="thinking" ? "thinkBob 1.5s ease-in-out infinite" : expression==="happy" ? "wiggle .6s ease" : "breathe 3.5s ease-in-out infinite";
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 130 130" style="filter:drop-shadow(0 6px 20px rgba(13,155,126,0.3));animation:${bodyAnim}">
+    <defs>
+      <radialGradient id="fg" cx="38%" cy="30%" r="65%">
+        <stop offset="0%" stop-color="#1ecfa8"/>
+        <stop offset="100%" stop-color="#0a7a63"/>
+      </radialGradient>
+      <radialGradient id="fs" cx="35%" cy="25%" r="50%">
+        <stop offset="0%" stop-color="white" stop-opacity=".2"/>
+        <stop offset="100%" stop-color="white" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <circle cx="65" cy="10" r="6" fill="${ac}">
+      <animate attributeName="r" values="6;7.5;6" dur="1.8s" repeatCount="indefinite"/>
+    </circle>
+    <line x1="65" y1="16" x2="65" y2="30" stroke="#0a8a6e" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="65" cy="73" r="48" fill="url(#fg)"/>
+    <circle cx="65" cy="73" r="48" fill="url(#fs)"/>
+    ${eyes[expression]||eyes.idle}
+    <ellipse cx="30" cy="80" rx="11" ry="7" fill="#F4845F" opacity="${cheekOpacity}"/>
+    <ellipse cx="100" cy="80" rx="11" ry="7" fill="#F4845F" opacity="${cheekOpacity}"/>
+    ${mouths[expression]||mouths.idle}
+  </svg>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOPIC DETECTION & PROMPT
+// ══════════════════════════════════════════════════════════════
+const TOPICS = {
+  "Matematik":["matematik","sayı","toplama","çıkarma","çarpma","bölme","kesir","geometri","denklem","yüzde"],
+  "Fen":["fen","fizik","kimya","biyoloji","deney","atom","hücre","enerji","kuvvet","gezegen"],
+  "Dil":["türkçe","kelime","cümle","hikaye","şiir","okuma","dilbilgisi","ingilizce","dil"],
+  "Tarih":["tarih","osmanlı","atatürk","savaş","medeniyet","cumhuriyet"],
 };
-
-// ── AUTH ─────────────────────────────────────────────────────
-function switchTab(mode) {
-  authMode = mode;
-  document.getElementById("field-name").classList.toggle("hidden", mode==="login");
-  document.getElementById("tab-login").style.background = mode==="login" ? "#0D9B7E" : "transparent";
-  document.getElementById("tab-login").style.color = mode==="login" ? "white" : "rgba(255,255,255,.4)";
-  document.getElementById("tab-register").style.background = mode==="register" ? "#0D9B7E" : "transparent";
-  document.getElementById("tab-register").style.color = mode==="register" ? "white" : "rgba(255,255,255,.4)";
-  document.getElementById("auth-btn").textContent = mode==="login" ? "Giriş Yap →" : "Hesap Oluştur →";
-  showAuthMsg("","");
-}
-
-function showAuthMsg(msg, type) {
-  const el = document.getElementById("auth-msg");
-  if(!msg){el.style.display="none";return;}
-  el.style.display = "block";
-  el.style.background = type==="ok" ? "rgba(13,155,126,.15)" : "rgba(244,132,95,.15)";
-  el.style.border = type==="ok" ? "1px solid rgba(13,155,126,.3)" : "1px solid rgba(244,132,95,.3)";
-  el.style.color = type==="ok" ? "#5eead4" : "#fca88a";
-  el.textContent = msg;
-}
-
-async function doAuth() {
-  const email = document.getElementById("inp-email").value.trim();
-  const pw = document.getElementById("inp-pw").value;
-  const name = document.getElementById("inp-name")?.value.trim();
-  if(!email||!pw){showAuthMsg("E-posta ve şifre zorunlu.","err");return;}
-  if(authMode==="register"&&!name){showAuthMsg("Adınızı girin.","err");return;}
-  if(pw.length<6){showAuthMsg("Şifre en az 6 karakter.","err");return;}
-  const btn = document.getElementById("auth-btn");
-  btn.textContent="Bekleyin..."; btn.disabled=true;
-  try {
-    if(authMode==="register") {
-      const {data,error} = await sb.auth.signUp({email,password:pw,options:{data:{full_name:name}}});
-      if(error) throw error;
-      if(data.user){
-        await sb.from("parents").upsert({id:data.user.id,email,full_name:name});
-        showAuthMsg("Hesap oluşturuldu!","ok");
-        setTimeout(()=>{currentUser=data.user;loadChildren();},1000);
-      }
-    } else {
-      const {data,error} = await sb.auth.signInWithPassword({email,password:pw});
-      if(error) throw error;
-      currentUser=data.user; loadChildren();
-    }
-  } catch(e) {
-    showAuthMsg(e.message==="Invalid login credentials"?"E-posta veya şifre hatalı.":e.message,"err");
-  } finally { btn.textContent=authMode==="login"?"Giriş Yap →":"Hesap Oluştur →"; btn.disabled=false; }
-}
-
-async function signOut() {
-  await sb.auth.signOut();
-  currentUser=null; currentChild=null;
-  show("auth");
-}
-
-// ── CHILDREN ─────────────────────────────────────────────────
-async function loadChildren() {
-  show("children");
-  document.getElementById("user-email").textContent = currentUser.email;
-  const {data} = await sb.from("children").select("*").order("created_at");
-  renderChildren(data||[]);
-}
-
-function renderChildren(list) {
-  const el = document.getElementById("children-list");
-  el.innerHTML = "";
-  list.forEach((c,i) => {
-    const d = document.createElement("div");
-    d.className = "card";
-    d.innerHTML = `
-      <div style="width:52px;height:52px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:800;flex-shrink:0">${c.name[0].toUpperCase()}</div>
-      <div style="flex:1"><div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div><div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaşında · ${c.total_sessions||0} oturum</div></div>
-      <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:30px;height:30px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;font-size:14px">🗑️</button>
-      <div style="font-size:20px;color:#d1d5db">›</div>
-    `;
-    d.onclick = () => startChat(c);
-    el.appendChild(d);
-  });
-}
-
-function showAddForm(){document.getElementById("add-form").classList.remove("hidden");document.getElementById("show-add-btn").classList.add("hidden");}
-function hideAddForm(){document.getElementById("add-form").classList.add("hidden");document.getElementById("show-add-btn").classList.remove("hidden");}
-
-async function addChild() {
-  const name = document.getElementById("new-name").value.trim();
-  const age = document.getElementById("new-age").value;
-  if(!name) return;
-  const btn = document.getElementById("add-btn");
-  btn.textContent="Kaydediliyor..."; btn.disabled=true;
-  const {data} = await sb.from("children").insert({parent_id:currentUser.id,name,age:parseInt(age),language:"tr"}).select().single();
-  btn.textContent="Profil Ekle →"; btn.disabled=false;
-  if(data){ hideAddForm(); document.getElementById("new-name").value=""; loadChildren(); }
-}
-
-async function deleteChild(id) {
-  if(!confirm("Bu profili silmek istiyor musun?")) return;
-  await sb.from("children").delete().eq("id",id);
-  loadChildren();
-}
-
-// ── CHAT ─────────────────────────────────────────────────────
-async function startChat(child) {
-  currentChild = child;
-  messages = [];
-  sessionStart = new Date();
-  show("chat");
-  document.getElementById("messages").innerHTML="";
-  document.getElementById("quick-prompts").style.display="flex";
-
-  const {data} = await sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single();
-  if(data) sessionId = data.id;
-
-  addMessage("bibi", `Merhaba ${child.name}! 👋 Ben Bibi — seninle öğrenmek için buradayım. Bugün ne hakkında konuşmak istersin? 🌟`);
-}
-
-async function goBack() {
-  if(sessionId) {
-    const mins = Math.round((new Date()-sessionStart)/60000);
-    await sb.from("sessions").update({ended_at:new Date().toISOString(),duration_mins:mins,message_count:messages.filter(m=>m.r==="user").length}).eq("id",sessionId);
-  }
-  sessionId=null; loadChildren();
-}
-
-function addMessage(role, text) {
-  messages.push({r:role,t:text});
-  const el = document.getElementById("messages");
-  const row = document.createElement("div");
-  row.className = "msg-row " + (role==="bibi"?"bibi":"user");
-  const bubble = document.createElement("div");
-  bubble.className = role==="bibi"?"msg-bibi":"msg-user";
-  bubble.textContent = text;
-  row.appendChild(bubble);
-  if(role==="bibi") {
-    const btn = document.createElement("button");
-    btn.style.cssText="width:28px;height:28px;border-radius:50%;background:#f0f7f5;border:1.5px solid #c5e8e0;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7;align-self:flex-end";
-    btn.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="#0D9B7E"/></svg>';
-    btn.onclick=()=>speak(text);
-    row.appendChild(btn);
-  }
-  el.appendChild(row);
-  el.scrollTop=el.scrollHeight;
-  if(messages.length>2) document.getElementById("quick-prompts").style.display="none";
-}
-
-function addTyping() {
-  const el = document.getElementById("messages");
-  const row = document.createElement("div");
-  row.id="typing-row";row.className="msg-row bibi";
-  row.innerHTML='<div class="msg-bibi" style="display:flex;gap:5px;align-items:center"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>';
-  el.appendChild(row);el.scrollTop=el.scrollHeight;
-}
-
-function removeTyping(){const t=document.getElementById("typing-row");if(t)t.remove();}
-
-function setInput(v){document.getElementById("chat-input").value=v;}
-
-function setStatus(text,color){
-  document.getElementById("status-text").textContent=text;
-  document.getElementById("status-dot").style.background=color;
+function detectTopic(t){
+  const l=t.toLowerCase();
+  for(const[k,v]of Object.entries(TOPICS)) if(v.some(w=>l.includes(w))) return k;
+  return "Genel";
 }
 
 function buildPrompt(child){
-  const tone=child.age<=8?"Çok kısa cümleler. Bol emoji 😊":child.age<=12?"Dengeli açıklamalar.":"Akran gibi konuş.";
-  return `Sen Bibi'sin — ${child.age} yaşındaki ${child.name} için AI öğrenme arkadaşısın. Sıcak, sabırlı ve meraklısın. Asla "yanlış" demezsin. Her cevabının sonunda soru sorarsın. ${tone} Dil: Türkçe. Kısa cevaplar ver.`;
+  const tone = child.age<=8
+    ? "Çok kısa cümleler kur. Somut örnekler ver. Bol emoji kullan 😊 Oyunlaştır her şeyi."
+    : child.age<=12 ? "Dengeli açıklamalar yap. Analoji ve hikayeler kullan."
+    : "Neredeyse akran gibi konuş. Az emoji. Daha derin açıklamalar.";
+  const gender = child.gender==="kız" ? "kız" : "erkek";
+  return `Sen Bibi'sin — ${child.age} yaşında ${gender} çocuk olan ${child.name} için özel AI öğrenme arkadaşısın.
+Sınıfı: ${child.grade||"?"} 
+Kişiliğin: Sıcak, sabırlı, meraklı. Asla "yanlış" demezsin, "yaklaştın!" dersin. Her cevabının sonunda soru sorarsın. ${tone}
+Dil: Türkçe. Çocuk başka dil yazarsa o dilde yanıt ver.
+Güvenlik: Kişisel bilgi sorma. Üzgün göründüğünde nazikçe yönlendir.
+Kısa ve odaklı cevaplar ver. Çok uzun paragraflar yazma.`;
 }
 
+// ══════════════════════════════════════════════════════════════
+// BACKGROUND THEME (by child gender & age)
+// ══════════════════════════════════════════════════════════════
+function getTheme(child){
+  if(!child) return { bg:"linear-gradient(135deg,#1A2E2A 0%,#243d38 100%)", header:"linear-gradient(135deg,#0D9B7E,#0a7a63)", bubble:"#0D9B7E", colors:["#0D9B7E"] };
+  const isGirl = child.gender==="kız";
+  const isYoung = child.age<=8;
+  if(isGirl && isYoung) return {
+    bg:"linear-gradient(135deg,#2d1b3d 0%,#1a1040 50%,#2d0f2d 100%)",
+    header:"linear-gradient(135deg,#b5449a,#7c2d8e)",
+    bubble:"#b5449a", colors:["#e879c8","#a855f7","#ec4899"],
+    stars:true
+  };
+  if(isGirl && !isYoung) return {
+    bg:"linear-gradient(135deg,#1e1040 0%,#2d1b4e 100%)",
+    header:"linear-gradient(135deg,#7c3aed,#5b21b6)",
+    bubble:"#7c3aed", colors:["#a78bfa","#c084fc","#e879c8"],
+    stars:true
+  };
+  if(!isGirl && isYoung) return {
+    bg:"linear-gradient(135deg,#0c2340 0%,#1a3a5c 100%)",
+    header:"linear-gradient(135deg,#2563eb,#1d4ed8)",
+    bubble:"#2563eb", colors:["#3b82f6","#0ea5e9","#0D9B7E"]
+  };
+  return {
+    bg:"linear-gradient(135deg,#1a2e2a 0%,#0f2535 100%)",
+    header:"linear-gradient(135deg,#0D9B7E,#0369a1)",
+    bubble:"#0D9B7E", colors:["#0D9B7E","#0ea5e9","#3b82f6"]
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCREEN: LOADING
+// ══════════════════════════════════════════════════════════════
+function screenLoading(){
+  render(`<div style="display:flex;flex-direction:column;align-items:center;gap:20px;animation:fadeIn .5s ease">
+    <div style="animation:bounce 1.5s ease-in-out infinite">${bibiFaceSVG("idle",100)}</div>
+    <div style="color:rgba(255,255,255,.5);font-size:14px;font-weight:600">Yükleniyor...</div>
+  </div>`);
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCREEN: AUTH (Login / Register with phone)
+// ══════════════════════════════════════════════════════════════
+let authMode = "login", authMethod = "email";
+let registerStep = 1; // 1=account, 2=parent info, 3=child info
+let regData = {};
+
+function screenAuth(){
+  render(`
+  <div style="width:100%;min-height:100vh;background:linear-gradient(135deg,#1A2E2A 0%,#243d38 100%);position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:20px">
+    ${floatingBibis(8,["#0D9B7E","#1ecfa8"])}
+    <div style="width:100%;max-width:400px;position:relative;z-index:10;animation:fadeUp .5s ease">
+      <!-- Logo -->
+      <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px">
+        <div style="animation:bounce 2s ease-in-out infinite">${bibiFaceSVG("happy",90)}</div>
+        <div style="color:white;font-size:34px;font-weight:900;margin-top:10px;letter-spacing:-1px">bibi</div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px;text-align:center">6-15 yaş çocuklar için AI öğrenme arkadaşı</div>
+      </div>
+
+      <!-- Card -->
+      <div style="background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);border-radius:22px;padding:26px 24px 22px">
+        <!-- Tabs -->
+        <div style="display:flex;background:rgba(0,0,0,.25);border-radius:13px;padding:4px;margin-bottom:22px">
+          <button onclick="switchAuthMode('login')" id="tab-login" style="flex:1;padding:9px 0;border-radius:10px;border:none;cursor:pointer;font-weight:800;font-size:14px;background:#0D9B7E;color:white;transition:all .2s">Giriş Yap</button>
+          <button onclick="switchAuthMode('register')" id="tab-reg" style="flex:1;padding:9px 0;border-radius:10px;border:none;cursor:pointer;font-weight:800;font-size:14px;background:transparent;color:rgba(255,255,255,.45);transition:all .2s">Kayıt Ol</button>
+        </div>
+
+        <!-- Login form -->
+        <div id="login-form">
+          <!-- Method tabs -->
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button onclick="switchMethod('email')" id="m-email" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:white;font-weight:700;font-size:13px;cursor:pointer">✉️ E-posta</button>
+            <button onclick="switchMethod('phone')" id="m-phone" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.5);font-weight:700;font-size:13px;cursor:pointer">📱 Telefon</button>
+          </div>
+          <div id="login-email-fields" style="display:flex;flex-direction:column;gap:10px">
+            <input class="inp-dark" id="l-email" type="email" placeholder="E-posta adresiniz" onkeydown="if(event.key==='Enter')doLogin()"/>
+            <input class="inp-dark" id="l-pw" type="password" placeholder="Şifre" onkeydown="if(event.key==='Enter')doLogin()"/>
+          </div>
+          <div id="login-phone-fields" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+            <input class="inp-dark" id="l-phone" type="tel" placeholder="+90 5XX XXX XX XX" onkeydown="if(event.key==='Enter')doLoginPhone()"/>
+            <div id="otp-row" class="hidden" style="display:flex;gap:8px">
+              <input class="inp-dark" id="l-otp" placeholder="Doğrulama kodu" style="flex:1" onkeydown="if(event.key==='Enter')verifyOTP()"/>
+              <button onclick="verifyOTP()" style="padding:12px 16px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer;white-space:nowrap">Doğrula</button>
+            </div>
+          </div>
+          <div id="login-msg" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;margin-top:12px"></div>
+          <button onclick="doLogin()" id="login-btn" class="btn-primary" style="margin-top:16px">Giriş Yap →</button>
+        </div>
+
+        <!-- Register step 1: account -->
+        <div id="reg-form-1" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Adım 1 / 3 — Hesap Bilgileri</div>
+          <div style="display:flex;gap:8px;margin-bottom:4px">
+            <button onclick="switchRegMethod('email')" id="rm-email" style="flex:1;padding:7px;border-radius:10px;border:1.5px solid rgba(255,255,255,.3);background:rgba(255,255,255,.15);color:white;font-weight:700;font-size:12px;cursor:pointer">✉️ E-posta</button>
+            <button onclick="switchRegMethod('phone')" id="rm-phone" style="flex:1;padding:7px;border-radius:10px;border:1.5px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.45);font-weight:700;font-size:12px;cursor:pointer">📱 Telefon</button>
+          </div>
+          <div id="reg-email-fields">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <input class="inp-dark" id="r-email" type="email" placeholder="E-posta adresiniz"/>
+              <input class="inp-dark" id="r-pw" type="password" placeholder="Şifre (en az 6 karakter)"/>
+            </div>
+          </div>
+          <div id="reg-phone-fields" class="hidden">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <input class="inp-dark" id="r-phone" type="tel" placeholder="+90 5XX XXX XX XX"/>
+              <div id="reg-otp-row" class="hidden" style="display:flex;gap:8px">
+                <input class="inp-dark" id="r-otp" placeholder="Doğrulama kodu" style="flex:1"/>
+                <button onclick="verifyRegOTP()" style="padding:12px 16px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer">Doğrula</button>
+              </div>
+            </div>
+          </div>
+          <div id="reg-msg-1" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
+          <button onclick="regStep1Next()" class="btn-primary">Devam Et →</button>
+        </div>
+
+        <!-- Register step 2: parent info -->
+        <div id="reg-form-2" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Adım 2 / 3 — Veli Bilgileri</div>
+          <input class="inp-dark" id="r-name" placeholder="Adınız Soyadınız"/>
+          <select class="inp-dark" id="r-role" style="cursor:pointer">
+            <option value="">Çocukla ilişkiniz</option>
+            <option value="anne">Anne</option>
+            <option value="baba">Baba</option>
+            <option value="abi">Abi / Erkek Kardeş</option>
+            <option value="abla">Abla / Kız Kardeş</option>
+            <option value="anneanne">Anneanne</option>
+            <option value="babaanne">Babaanne</option>
+            <option value="dede">Dede</option>
+            <option value="diger">Diğer</option>
+          </select>
+          <select class="inp-dark" id="r-age-range" style="cursor:pointer">
+            <option value="">Yaş aralığınız</option>
+            <option value="18-25">18-25</option>
+            <option value="26-35">26-35</option>
+            <option value="36-45">36-45</option>
+            <option value="46-55">46-55</option>
+            <option value="55+">55+</option>
+          </select>
+          <select class="inp-dark" id="r-edu" style="cursor:pointer">
+            <option value="">Öğrenim durumunuz</option>
+            <option value="ilkokul">İlkokul</option>
+            <option value="ortaokul">Ortaokul</option>
+            <option value="lise">Lise</option>
+            <option value="onlisans">Ön Lisans</option>
+            <option value="lisans">Lisans</option>
+            <option value="yukseklisans">Yüksek Lisans / Doktora</option>
+          </select>
+          <input class="inp-dark" id="r-job" placeholder="Mesleğiniz (isteğe bağlı)"/>
+          <div id="reg-msg-2" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
+          <div style="display:flex;gap:8px">
+            <button onclick="showStep(1)" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">← Geri</button>
+            <button onclick="regStep2Next()" class="btn-primary" style="flex:2">Devam Et →</button>
+          </div>
+        </div>
+
+        <!-- Register step 3: child info -->
+        <div id="reg-form-3" class="hidden" style="display:flex;flex-direction:column;gap:10px">
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px">Adım 3 / 3 — Çocuk Bilgileri</div>
+          <input class="inp-dark" id="r-cname" placeholder="Çocuğunuzun adı"/>
+          <div style="display:flex;gap:8px">
+            <button onclick="selectGender('kız')" id="g-kiz" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👧 Kız</button>
+            <button onclick="selectGender('erkek')" id="g-erkek" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👦 Erkek</button>
+          </div>
+          <select class="inp-dark" id="r-cage" style="cursor:pointer">
+            <option value="">Çocuğun yaşı</option>
+            ${Array.from({length:12},(_,i)=>i+4).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
+          </select>
+          <select class="inp-dark" id="r-grade" style="cursor:pointer">
+            <option value="">Kaçıncı sınıf?</option>
+            ${["Okul öncesi","1. Sınıf","2. Sınıf","3. Sınıf","4. Sınıf","5. Sınıf","6. Sınıf","7. Sınıf","8. Sınıf","9. Sınıf","10. Sınıf","11. Sınıf","12. Sınıf"].map((g,i)=>`<option value="${g}">${g}</option>`).join("")}
+          </select>
+          <div id="reg-msg-3" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
+          <div style="display:flex;gap:8px">
+            <button onclick="showStep(2)" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">← Geri</button>
+            <button onclick="regComplete()" id="reg-done-btn" class="btn-primary" style="flex:2">Bibi'ye Başla! 🚀</button>
+          </div>
+        </div>
+
+      </div>
+      <div style="text-align:center;margin-top:18px;color:rgba(255,255,255,.25);font-size:12px">Bibi · Çocuklar için güvenli AI 🔒</div>
+    </div>
+  </div>`);
+}
+
+let regMethod = "email", loginMethodCurrent = "email", selectedGender = "";
+
+function switchAuthMode(mode){
+  authMode = mode;
+  el("tab-login").style.background = mode==="login" ? "#0D9B7E" : "transparent";
+  el("tab-login").style.color = mode==="login" ? "white" : "rgba(255,255,255,.45)";
+  el("tab-reg").style.background = mode==="register" ? "#0D9B7E" : "transparent";
+  el("tab-reg").style.color = mode==="register" ? "white" : "rgba(255,255,255,.45)";
+  el("login-form").classList.toggle("hidden", mode!=="login");
+  showStep(mode==="register" ? 1 : 0);
+}
+
+function showStep(step){
+  [1,2,3].forEach(s => {
+    const e = el(`reg-form-${s}`);
+    if(e){ e.classList.toggle("hidden", s!==step); }
+  });
+}
+
+function switchMethod(m){
+  loginMethodCurrent = m;
+  el("m-email").style.background = m==="email" ? "rgba(255,255,255,.15)" : "transparent";
+  el("m-email").style.borderColor = m==="email" ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.1)";
+  el("m-email").style.color = m==="email" ? "white" : "rgba(255,255,255,.45)";
+  el("m-phone").style.background = m==="phone" ? "rgba(255,255,255,.15)" : "transparent";
+  el("m-phone").style.borderColor = m==="phone" ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.1)";
+  el("m-phone").style.color = m==="phone" ? "white" : "rgba(255,255,255,.45)";
+  el("login-email-fields").classList.toggle("hidden", m!=="email");
+  el("login-phone-fields").classList.toggle("hidden", m!=="phone");
+  el("login-btn").textContent = m==="phone" ? "Kod Gönder →" : "Giriş Yap →";
+  el("login-btn").onclick = m==="phone" ? doLoginPhone : doLogin;
+}
+
+function switchRegMethod(m){
+  regMethod = m;
+  el("rm-email").style.background = m==="email" ? "rgba(255,255,255,.15)" : "transparent";
+  el("rm-email").style.borderColor = m==="email" ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.1)";
+  el("rm-email").style.color = m==="email" ? "white" : "rgba(255,255,255,.45)";
+  el("rm-phone").style.background = m==="phone" ? "rgba(255,255,255,.15)" : "transparent";
+  el("rm-phone").style.borderColor = m==="phone" ? "rgba(255,255,255,.3)" : "rgba(255,255,255,.1)";
+  el("rm-phone").style.color = m==="phone" ? "white" : "rgba(255,255,255,.45)";
+  el("reg-email-fields").classList.toggle("hidden", m!=="email");
+  el("reg-phone-fields").classList.toggle("hidden", m!=="phone");
+}
+
+function selectGender(g){
+  selectedGender = g;
+  ["kiz","erkek"].forEach(id => {
+    const btn = el(`g-${id}`);
+    const active = (id==="kiz"&&g==="kız")||(id==="erkek"&&g==="erkek");
+    btn.style.background = active ? "rgba(255,255,255,.2)" : "transparent";
+    btn.style.borderColor = active ? "rgba(255,255,255,.5)" : "rgba(255,255,255,.15)";
+    btn.style.color = active ? "white" : "rgba(255,255,255,.5)";
+  });
+}
+
+async function doLogin(){
+  const email = el("l-email")?.value.trim();
+  const pw = el("l-pw")?.value;
+  if(!email||!pw){ showMsg("login-msg","E-posta ve şifre girin.","err"); return; }
+  el("login-btn").textContent = "Giriş yapılıyor..."; el("login-btn").disabled=true;
+  const {data,error} = await sb.auth.signInWithPassword({email,password:pw});
+  el("login-btn").textContent = "Giriş Yap →"; el("login-btn").disabled=false;
+  if(error){ showMsg("login-msg", error.message==="Invalid login credentials"?"E-posta veya şifre hatalı.":error.message,"err"); return; }
+  currentUser=data.user; screenChildren();
+}
+
+async function doLoginPhone(){
+  const phone = el("l-phone")?.value.trim();
+  if(!phone){ showMsg("login-msg","Telefon numarası girin.","err"); return; }
+  const {error} = await sb.auth.signInWithOtp({phone});
+  if(error){ showMsg("login-msg","SMS gönderilemedi: "+error.message,"err"); return; }
+  el("otp-row").classList.remove("hidden");
+  el("login-btn").textContent = "Kodu Doğrula →";
+  el("login-btn").onclick = verifyOTP;
+  showMsg("login-msg","SMS gönderildi! Kodu girin.","ok");
+}
+
+async function verifyOTP(){
+  const phone = el("l-phone")?.value.trim();
+  const token = el("l-otp")?.value.trim();
+  const {data,error} = await sb.auth.verifyOtp({phone, token, type:"sms"});
+  if(error){ showMsg("login-msg","Kod hatalı.","err"); return; }
+  currentUser=data.user; screenChildren();
+}
+
+async function regStep1Next(){
+  if(regMethod==="email"){
+    const email=el("r-email")?.value.trim(), pw=el("r-pw")?.value;
+    if(!email||!pw){ showMsg("reg-msg-1","E-posta ve şifre gerekli.","err"); return; }
+    if(pw.length<6){ showMsg("reg-msg-1","Şifre en az 6 karakter olmalı.","err"); return; }
+    regData.email=email; regData.pw=pw;
+  } else {
+    const phone=el("r-phone")?.value.trim();
+    if(!phone){ showMsg("reg-msg-1","Telefon numarası gerekli.","err"); return; }
+    regData.phone=phone;
+    const {error}=await sb.auth.signInWithOtp({phone});
+    if(error){ showMsg("reg-msg-1","SMS gönderilemedi: "+error.message,"err"); return; }
+    el("reg-otp-row").classList.remove("hidden");
+    showMsg("reg-msg-1","SMS gönderildi!","ok"); return;
+  }
+  showStep(2);
+}
+
+async function verifyRegOTP(){
+  const phone=el("r-phone")?.value.trim(), token=el("r-otp")?.value.trim();
+  const {data,error}=await sb.auth.verifyOtp({phone,token,type:"sms"});
+  if(error){ showMsg("reg-msg-1","Kod hatalı.","err"); return; }
+  currentUser=data.user; regData.phone=phone;
+  showStep(2);
+}
+
+function regStep2Next(){
+  const name=el("r-name")?.value.trim(), role=el("r-role")?.value;
+  const ageRange=el("r-age-range")?.value, edu=el("r-edu")?.value;
+  if(!name||!role||!ageRange||!edu){ showMsg("reg-msg-2","Lütfen zorunlu alanları doldurun.","err"); return; }
+  regData.full_name=name; regData.role=role; regData.age_range=ageRange;
+  regData.education=edu; regData.job=el("r-job")?.value.trim()||"";
+  showStep(3);
+}
+
+async function regComplete(){
+  const cname=el("r-cname")?.value.trim(), cage=el("r-cage")?.value, grade=el("r-grade")?.value;
+  if(!cname||!cage||!selectedGender){ showMsg("reg-msg-3","Çocuğun adı, yaşı ve cinsiyeti gerekli.","err"); return; }
+  el("reg-done-btn").textContent="Kaydediliyor..."; el("reg-done-btn").disabled=true;
+  try {
+    let user = currentUser;
+    if(!user && regData.email){
+      const {data,error}=await sb.auth.signUp({email:regData.email,password:regData.pw,options:{data:{full_name:regData.full_name}}});
+      if(error) throw error;
+      user=data.user;
+    }
+    if(!user) throw new Error("Kullanıcı oluşturulamadı.");
+    await sb.from("parents").upsert({
+      id:user.id, email:user.email||regData.phone,
+      full_name:regData.full_name, phone:regData.phone||null,
+      role:regData.role, age_range:regData.age_range,
+      education:regData.education, job:regData.job
+    });
+    await sb.from("children").insert({
+      parent_id:user.id, name:cname, age:parseInt(cage),
+      gender:selectedGender, grade:grade, language:"tr"
+    });
+    currentUser=user; screenChildren();
+  } catch(e){
+    showMsg("reg-msg-3",e.message,"err");
+    el("reg-done-btn").textContent="Bibi'ye Başla! 🚀"; el("reg-done-btn").disabled=false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// SCREEN: CHILDREN
+// ══════════════════════════════════════════════════════════════
+async function screenChildren(){
+  const {data:list=[]} = await sb.from("children").select("*").order("created_at");
+  const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
+
+  render(`
+  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
+    ${floatingBibis(10,["#0D9B7E","#7C3AED","#F4845F","#2563EB"])}
+    <div style="position:relative;z-index:2;padding:28px 20px 60px;max-width:500px;margin:0 auto">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
+        <div>
+          <div style="font-size:22px;font-weight:900;color:#1A2E2A">Merhaba! 👋</div>
+          <div style="font-size:13px;color:#6B7280;margin-top:2px">${currentUser?.email||currentUser?.phone||""}</div>
+        </div>
+        <button onclick="signOut()" style="padding:8px 18px;border-radius:20px;background:white;border:1.5px solid #e0f0ec;color:#6B7280;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06)">Çıkış</button>
+      </div>
+
+      <div style="font-size:12px;font-weight:800;color:#0D9B7E;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">Kim oynayacak?</div>
+
+      <!-- Children list -->
+      <div id="children-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
+        ${list.map((c,i)=>`
+        <div onclick="startChat(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="background:white;border-radius:18px;padding:16px 18px;box-shadow:0 4px 20px rgba(0,0,0,.08);cursor:pointer;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.14)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'">
+          <div style="width:54px;height:54px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.15)">${c.gender==="kız"?"👧":"👦"}</div>
+          <div style="flex:1">
+            <div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div>
+            <div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaş · ${c.grade||""} · ${c.gender==="kız"?"Kız":"Erkek"}</div>
+          </div>
+          <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:32px;height:32px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">🗑️</button>
+          <div style="font-size:22px;color:#d1d5db">›</div>
+        </div>`).join("")}
+      </div>
+
+      <!-- Add child -->
+      <div id="add-form" class="hidden" style="background:white;border-radius:18px;padding:22px 20px;box-shadow:0 4px 20px rgba(0,0,0,.08);margin-bottom:16px;animation:fadeUp .3s ease">
+        <div style="font-size:16px;font-weight:800;color:#1A2E2A;margin-bottom:16px">Yeni Profil Ekle</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input id="new-name" placeholder="Çocuğun adı" class="inp-light"/>
+          <div style="display:flex;gap:8px">
+            <button onclick="selectNewGender('kız')" id="ng-kiz" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👧 Kız</button>
+            <button onclick="selectNewGender('erkek')" id="ng-erkek" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👦 Erkek</button>
+          </div>
+          <select id="new-age" class="inp-light">
+            <option value="">Yaş seçin</option>
+            ${Array.from({length:12},(_,i)=>i+4).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
+          </select>
+          <select id="new-grade" class="inp-light">
+            <option value="">Sınıf seçin</option>
+            ${["Okul öncesi","1. Sınıf","2. Sınıf","3. Sınıf","4. Sınıf","5. Sınıf","6. Sınıf","7. Sınıf","8. Sınıf","9. Sınıf","10. Sınıf","11. Sınıf","12. Sınıf"].map(g=>`<option value="${g}">${g}</option>`).join("")}
+          </select>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button onclick="hideAddForm()" class="btn-secondary" style="flex:1">İptal</button>
+          <button onclick="addChild()" style="flex:2;padding:12px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:14px;cursor:pointer">Profil Ekle →</button>
+        </div>
+      </div>
+
+      <button id="show-add-btn" onclick="showAddForm()" style="width:100%;padding:15px;border-radius:18px;border:2.5px dashed #b8ddd6;background:rgba(255,255,255,.7);color:#0D9B7E;font-size:15px;font-weight:800;cursor:pointer;transition:all .2s" onmouseover="this.style.background='white'" onmouseout="this.style.background='rgba(255,255,255,.7)'">
+        + Yeni Profil Ekle
+      </button>
+    </div>
+  </div>`);
+}
+
+let newGender = "";
+function selectNewGender(g){
+  newGender=g;
+  ["kiz","erkek"].forEach(id=>{
+    const btn=el(`ng-${id}`), active=(id==="kiz"&&g==="kız")||(id==="erkek"&&g==="erkek");
+    btn.style.background = active?"#e8f7f3":"white";
+    btn.style.borderColor = active?"#0D9B7E":"#e0f0ec";
+    btn.style.color = active?"#0D9B7E":"#6B7280";
+  });
+}
+
+function showAddForm(){ el("add-form").classList.remove("hidden"); el("show-add-btn").classList.add("hidden"); }
+function hideAddForm(){ el("add-form").classList.add("hidden"); el("show-add-btn").classList.remove("hidden"); }
+
+async function addChild(){
+  const name=el("new-name")?.value.trim(), age=el("new-age")?.value, grade=el("new-grade")?.value;
+  if(!name||!age||!newGender){ alert("Ad, cinsiyet ve yaş zorunlu!"); return; }
+  await sb.from("children").insert({parent_id:currentUser.id,name,age:parseInt(age),gender:newGender,grade,language:"tr"});
+  newGender=""; screenChildren();
+}
+
+async function deleteChild(id){
+  if(!confirm("Bu profili silmek istiyor musun?"))return;
+  await sb.from("children").delete().eq("id",id);
+  screenChildren();
+}
+
+async function signOut(){ await sb.auth.signOut(); currentUser=null; currentChild=null; screenAuth(); }
+
+// ══════════════════════════════════════════════════════════════
+// SCREEN: CHAT
+// ══════════════════════════════════════════════════════════════
+let chatExpr = "idle", mouthInterval = null;
+
+function startChat(child){
+  if(typeof child==="string") child=JSON.parse(child);
+  currentChild=child; messages=[]; sessionStart=new Date();
+  const theme=getTheme(child);
+
+  render(`
+  <div style="width:100%;min-height:100vh;display:flex;align-items:center;justify-content:center;background:${theme.bg};position:relative;overflow:hidden">
+    ${floatingBibis(6, theme.colors)}
+    ${theme.stars?`<div id="stars" style="position:absolute;inset:0;pointer-events:none;overflow:hidden">${Array.from({length:20},(_,i)=>`<div style="position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:white;animation:starTwinkle ${1+Math.random()*2}s ${Math.random()*2}s ease-in-out infinite"></div>`).join("")}</div>`:""}
+    <div style="width:100%;max-width:420px;height:100vh;display:flex;flex-direction:column;position:relative;z-index:2">
+
+      <!-- Header -->
+      <div id="chat-header" style="background:${theme.header};padding:18px 16px 22px;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;flex-shrink:0">
+        <button onclick="goBack()" style="position:absolute;top:14px;left:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button onclick="toggleVoice()" id="voice-btn" style="position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div id="bibi-face-wrap" style="position:relative">${bibiFaceSVG("idle",110)}</div>
+        <div style="text-align:center">
+          <div style="color:white;font-size:19px;font-weight:900">bibi</div>
+          <div style="color:rgba(255,255,255,.65);font-size:11px;margin-top:2px">${child.name} ile konuşuyor</div>
+          <div style="display:flex;align-items:center;gap:5px;justify-content:center;margin-top:4px">
+            <span id="status-dot" style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;transition:background .3s"></span>
+            <span id="status-text" style="color:rgba(255,255,255,.6);font-size:11px;font-weight:600">Seninle burada!</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="messages" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;background:rgba(255,255,255,.04);backdrop-filter:blur(8px)"></div>
+
+      <!-- Quick prompts -->
+      <div id="quick-prompts" style="padding:6px 16px 6px;display:flex;gap:6px;flex-wrap:wrap;background:rgba(255,255,255,.04)">
+        <button class="chip" onclick="setInput('Matematik ödev yardımı 📐')">Matematik ödev 📐</button>
+        <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü neden mavi? 🌤️</button>
+        <button class="chip" onclick="setInput('Hikaye anlat 📖')">Hikaye anlat 📖</button>
+        <button class="chip" onclick="setInput('Yeni kelime öğret 🔤')">Kelime öğret 🔤</button>
+      </div>
+
+      <!-- Input bar -->
+      <div style="padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);backdrop-filter:blur(12px);flex-shrink:0">
+        <div id="mic-err" style="display:none;background:rgba(244,132,95,.15);border:1px solid rgba(244,132,95,.3);border-radius:10px;padding:7px 12px;font-size:12px;color:#fca88a;font-weight:600;margin-bottom:8px;text-align:center"></div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="mic-btn" onclick="toggleMic()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" fill="white"/><path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="22" x2="15" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <input id="chat-input" placeholder="Bibi'ye yaz veya konuş..." onkeydown="if(event.key==='Enter')sendMessage()" style="flex:1;padding:12px 16px;border-radius:24px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.12);font-size:15px;color:white;backdrop-filter:blur(8px)"/>
+          <button id="send-btn" onclick="sendMessage()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.25);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>`);
+
+  // Start session & first message
+  sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{ if(data) sessionId=data.id; });
+  addMsg("bibi", `Merhaba ${child.name}! 👋 Ben Bibi — seninle öğrenmek için buradayım. Bugün ne hakkında konuşmak istersin? 🌟`);
+}
+
+function setExpr(expr){
+  chatExpr=expr;
+  const wrap=el("bibi-face-wrap");
+  if(wrap) wrap.innerHTML=bibiFaceSVG(expr,110);
+}
+
+function setStatus(text,color){
+  const d=el("status-dot"),t=el("status-text");
+  if(d) d.style.background=color;
+  if(t) t.textContent=text;
+}
+
+function addMsg(role, text){
+  messages.push({r:role,t:text});
+  const msgsEl=el("messages"); if(!msgsEl) return;
+  const theme=getTheme(currentChild);
+  const row=document.createElement("div");
+  row.className=`msg-row ${role}`;
+  const bubble=document.createElement("div");
+  bubble.className=role==="bibi"?"msg-bibi":"msg-user";
+  if(role==="user") bubble.style.background=theme.bubble;
+  bubble.textContent=text;
+  row.appendChild(bubble);
+  if(role==="bibi"){
+    const btn=document.createElement("button");
+    btn.style.cssText="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7";
+    btn.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
+    btn.onclick=()=>speak(text);
+    row.appendChild(btn);
+  }
+  msgsEl.appendChild(row);
+  msgsEl.scrollTop=msgsEl.scrollHeight;
+  if(messages.length>2){ const qp=el("quick-prompts"); if(qp) qp.style.display="none"; }
+}
+
+function addTyping(){
+  const msgsEl=el("messages"); if(!msgsEl) return;
+  const row=document.createElement("div");
+  row.id="typing-row"; row.className="msg-row bibi";
+  row.innerHTML='<div class="msg-bibi" style="display:flex;gap:5px;align-items:center;padding:14px 18px"><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease infinite"></span><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .2s infinite"></span><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .4s infinite"></span></div>';
+  msgsEl.appendChild(row); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+
+function removeTyping(){ const t=el("typing-row"); if(t) t.remove(); }
+function setInput(v){ const i=el("chat-input"); if(i) i.value=v; }
+
 async function sendMessage(){
-  const inp=document.getElementById("chat-input");
+  const inp=el("chat-input"); if(!inp) return;
   const text=inp.value.trim(); if(!text) return;
   inp.value="";
-  addMessage("user",text);
-  document.getElementById("send-btn").style.background="#c5e8e0";
-  setStatus("Düşünüyor...","#fbbf24");
+  addMsg("user",text);
+  setExpr("thinking"); setStatus("Düşünüyor...","#fbbf24");
   addTyping();
-
-  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,language:"tr"});
-
-  try {
-    const apiMsgs = messages.filter(m=>m.r!=="bibi"||messages.indexOf(m)===0).map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}));
-    // OpenRouter API
-    const chatMsgs = [
-      {role:"system", content: buildPrompt(currentChild)},
-      ...messages.map(m=>({role: m.r==="bibi"?"assistant":"user", content: m.t}))
-    ];
-    const res = await fetch(OPENROUTER_URL, {
+  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic:detectTopic(text),language:"tr"});
+  try{
+    const res=await fetch(OPENROUTER_URL,{
       method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization": `Bearer ${OPENROUTER_KEY}`,
-        "HTTP-Referer": "https://bibi-app-rho.vercel.app",
-        "X-Title": "Bibi"
-      },
-      body:JSON.stringify({
-        model: "openrouter/auto",
-        messages: chatMsgs,
-        max_tokens: 1000
-      })
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
+      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"system",content:buildPrompt(currentChild)},...messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}))],max_tokens:1000})
     });
     const data=await res.json();
-    console.log("OpenRouter response:", JSON.stringify(data));
     const reply=data.choices?.[0]?.message?.content||data.error?.message||"Bir sorun oluştu 🙈";
     removeTyping();
-    addMessage("bibi",reply);
-    setStatus("Seninle burada!","#4ade80");
-    document.getElementById("send-btn").style.background="#0D9B7E";
+    setExpr("happy"); setStatus("Seninle burada!","#4ade80");
+    addMsg("bibi",reply);
     speak(reply);
+    setTimeout(()=>setExpr("idle"),3000);
     if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
-  } catch(e){
-    removeTyping();
-    addMessage("bibi","Bağlantıda sorun var 😅 Tekrar dener misin?");
+  }catch(e){
+    removeTyping(); setExpr("idle");
+    addMsg("bibi","Bağlantıda sorun var 😅 Tekrar dener misin?");
     setStatus("Seninle burada!","#4ade80");
   }
+}
+
+async function goBack(){
+  if(sessionId){
+    const mins=Math.round((new Date()-sessionStart)/60000);
+    await sb.from("sessions").update({ended_at:new Date().toISOString(),duration_mins:mins,message_count:messages.filter(m=>m.r==="user").length}).eq("id",sessionId);
+  }
+  sessionId=null; screenChildren();
 }
 
 // ── VOICE ─────────────────────────────────────────────────────
@@ -444,34 +829,50 @@ function speak(text){
   const clean=text.replace(/[\u{1F000}-\u{1FFFF}]/gu,"").trim();
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(clean);
-  u.lang="tr-TR";u.rate=0.92;u.pitch=1.15;
+  u.lang="tr-TR"; u.rate=0.9; u.pitch=1.2;
   const vs=window.speechSynthesis.getVoices();
-  const tv=vs.find(v=>v.lang.startsWith("tr"));if(tv)u.voice=tv;
-  u.onstart=()=>setStatus("Konuşuyor...","#a78bfa");
-  u.onend=()=>setStatus("Seninle burada!","#4ade80");
+  const tv=vs.find(v=>v.lang.startsWith("tr")); if(tv) u.voice=tv;
+  u.onstart=()=>{setExpr("talking"); setStatus("Konuşuyor...","#a78bfa");};
+  u.onend=()=>{setExpr("idle"); setStatus("Seninle burada!","#4ade80");};
   window.speechSynthesis.speak(u);
 }
 
 function toggleVoice(){
   voiceOn=!voiceOn;
-  const btn=document.getElementById("voice-btn");
-  btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
+  const btn=el("voice-btn");
+  if(btn) btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
   if(!voiceOn) window.speechSynthesis?.cancel();
 }
 
 function toggleMic(){
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){showMicErr("Chrome kullan! 🎙️");return;}
-  if(isListening){recognition?.stop();return;}
-  recognition=new SR();recognition.lang="tr-TR";recognition.continuous=false;recognition.interimResults=true;
-  recognition.onstart=()=>{isListening=true;setStatus("Seni dinliyorum 🎙️","#F4845F");document.getElementById("mic-btn").style.background="#F4845F";document.getElementById("chat-input").placeholder="Dinliyorum...";};
-  recognition.onresult=e=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;document.getElementById("chat-input").value=t;};
-  recognition.onend=()=>{isListening=false;setStatus("Seninle burada!","#4ade80");document.getElementById("mic-btn").style.background="#f0f7f5";document.getElementById("chat-input").placeholder="Bibi'ye yaz veya konuş...";};
-  recognition.onerror=e=>{isListening=false;showMicErr(e.error==="not-allowed"?"Mikrofon izni gerekli!":"Ses duyamadım 🎤");};
+  if(!SR){ const e=el("mic-err"); if(e){e.textContent="Chrome kullan! 🎙️";e.style.display="block";setTimeout(()=>e.style.display="none",3000);} return; }
+  if(isListening){ recognition?.stop(); return; }
+  recognition=new SR(); recognition.lang="tr-TR"; recognition.continuous=false; recognition.interimResults=true;
+  recognition.onstart=()=>{ isListening=true; setExpr("listening"); setStatus("Seni dinliyorum 🎙️","#F4845F"); const btn=el("mic-btn"); if(btn) btn.style.background="#F4845F"; };
+  recognition.onresult=e=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; const inp=el("chat-input"); if(inp) inp.value=t; };
+  recognition.onend=()=>{ isListening=false; setExpr("idle"); setStatus("Seninle burada!","#4ade80"); const btn=el("mic-btn"); if(btn) btn.style.background="rgba(255,255,255,.15)"; };
+  recognition.onerror=e=>{ isListening=false; const err=el("mic-err"); if(err){err.textContent=e.error==="not-allowed"?"Mikrofon izni gerekli!":"Ses duyamadım 🎤";err.style.display="block";setTimeout(()=>err.style.display="none",3000);} };
   recognition.start();
 }
 
-function showMicErr(msg){const el=document.getElementById("mic-err");el.textContent=msg;el.style.display="block";setTimeout(()=>el.style.display="none",3000);}
+// ══════════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════════
+window.onload = async () => {
+  screenLoading();
+  const t=setTimeout(()=>screenAuth(),5000);
+  try {
+    const {data:{session}}=await sb.auth.getSession();
+    clearTimeout(t);
+    if(session?.user){ currentUser=session.user; screenChildren(); }
+    else screenAuth();
+  } catch(e){ clearTimeout(t); screenAuth(); }
+  sb.auth.onAuthStateChange((_,session)=>{
+    if(session?.user){ currentUser=session.user; if(!currentChild) screenChildren(); }
+    else{ currentUser=null; screenAuth(); }
+  });
+};
 </script>
 </body>
 </html>
