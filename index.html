@@ -639,7 +639,11 @@ async function saveCompleteProfile(){
 }
 
 async function screenChildren(){
-  const {data:list=[]} = await sb.from("children").select("*").order("created_at");
+  const [{data:list=[]},{data:parentData}] = await Promise.all([
+    sb.from("children").select("*").order("created_at"),
+    sb.from("parents").select("full_name").eq("id",currentUser.id).single()
+  ]);
+  const parentDisplay = parentData?.full_name || currentUser?.email || "";
   const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
 
   render(`
@@ -650,7 +654,7 @@ async function screenChildren(){
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
         <div>
           <div style="font-size:22px;font-weight:900;color:#1A2E2A">Merhaba! 👋</div>
-          <div style="font-size:13px;color:#6B7280;margin-top:2px">${currentUser?.email||currentUser?.phone||""}</div>
+          <div style="font-size:13px;color:#6B7280;margin-top:2px" id="parent-name-display">${parentDisplay}</div>
         </div>
         <button onclick="signOut()" style="padding:8px 18px;border-radius:20px;background:white;border:1.5px solid #e0f0ec;color:#6B7280;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06)">Çıkış</button>
       </div>
