@@ -131,6 +131,74 @@ function floatingBibis(count=6, colors=["#0D9B7E"]){
   return html;
 }
 
+// Age-based bubble content
+const BUBBLE_CONTENT = {
+  young: { // 4-8 yaş
+    questions: ["Neden gökyüzü mavi? 🌤️","Bulutlar neden beyaz?☁️","Balıklar nasıl nefes alır? 🐟","Yıldızlar neden parlar? ⭐","Gökkuşağı nasıl oluşur? 🌈","Dinozorlar neden yok oldu? 🦕","Ay neden değişir? 🌙","Çiçekler neden renkli? 🌸","Karlar neden beyaz? ❄️","Kediler neden miyavlar? 🐱"],
+    chat: ["Bibi bana hikaye anlat! 📖","Benimle oyna! 🎮","Bugün çok mutluyum! 😊","Sana sorum var!🙋","Bana şarkı öğret! 🎵","Hayvanları çok seviyorum! 🐾","Bugün okula gittim 🏫","Annem bana dondurma aldı 🍦"]
+  },
+  middle: { // 9-12 yaş
+    questions: ["Matematik nasıl çalışır? 📐","Uzayda hayat var mı? 🚀","İnsan beyni nasıl çalışır? 🧠","Depremler neden olur? 🌍","DNA nedir? 🧬","Işık neden hızlı? ⚡","Su döngüsü nasıl işler? 💧","Bitkiler nasıl büyür? 🌱","Elektrik nasıl üretilir? ⚡","Kara delikler gerçek mi? 🌌"],
+    chat: ["Ödev için yardım lazım 📚","Bugün sınavım vardı 😅","Arkadaşımla tartıştım 😕","En sevdiğim ders fen! 🔬","Futbol oynuyorum ⚽","Kitap okumayı seviyorum 📚","Oyun oynamak istiyorum 🎮","Gelecekte bilim insanı olacağım 🔭"]
+  },
+  teen: { // 13-15 yaş
+    questions: ["Yapay zeka nasıl çalışır? 🤖","Kuantum fiziği nedir? ⚛️","İklim değişikliği neden önemli? 🌍","Evren nasıl oluştu? 🌌","Felsefe ne işe yarar? 💭","Ekonomi nasıl çalışır? 💰","Genetik mühendisliği nedir? 🧬","Sanat neden önemli? 🎨","Sosyal medyanın etkileri? 📱","Girişimcilik nasıl öğrenilir? 💡"],
+    chat: ["Üniversite için plan yapıyorum 🎓","Kariyer seçmek zor 🤔","Teknoloji çok hızlı değişiyor 💻","Proje geliştiriyorum 🚀","Kitap önerisi lazım 📚","Müzik üretmek istiyorum 🎸","Dünyayı değiştirmek istiyorum 🌍","Kendi işimi kurmak istiyorum 💼"]
+  }
+};
+
+function getAgeGroup(age){
+  if(!age || age<=8) return "young";
+  if(age<=12) return "middle";
+  return "teen";
+}
+
+function floatingBubbles(children=[]){
+  // Get all unique age groups from children
+  const groups = children.length > 0 
+    ? [...new Set(children.map(c=>getAgeGroup(c.age)))]
+    : ["young","middle"];
+  
+  // Mix content from all children's age groups
+  let allQ = [], allC = [];
+  groups.forEach(g=>{
+    allQ.push(...BUBBLE_CONTENT[g].questions);
+    allC.push(...BUBBLE_CONTENT[g].chat);
+  });
+  
+  // Shuffle
+  const shuffle = arr => arr.sort(()=>Math.random()-.5);
+  allQ = shuffle(allQ).slice(0,8);
+  allC = shuffle(allC).slice(0,7);
+  
+  const anims = ["floatBibi","floatBibi2","floatBibi3"];
+  const positions = [
+    {x:2,y:5},{x:65,y:3},{x:80,y:15},{x:5,y:25},{x:70,y:28},
+    {x:15,y:45},{x:75,y:42},{x:3,y:60},{x:60,y:58},{x:85,y:60},
+    {x:10,y:75},{x:55,y:72},{x:80,y:78},{x:20,y:88},{x:65,y:88}
+  ];
+  
+  let html = "";
+  const allBubbles = [
+    ...allQ.map(t=>({text:t,type:"question"})),
+    ...allC.map(t=>({text:t,type:"chat"}))
+  ];
+  shuffle(allBubbles);
+  
+  allBubbles.slice(0,15).forEach((b,i)=>{
+    const pos = positions[i%positions.length];
+    const anim = anims[i%3];
+    const dur = 5+Math.random()*5;
+    const delay = Math.random()*4;
+    const isQ = b.type==="question";
+    const bg = isQ ? "rgba(13,155,126,0.12)" : "rgba(255,255,255,0.10)";
+    const border = isQ ? "1.5px solid rgba(13,155,126,0.25)" : "1.5px solid rgba(255,255,255,0.18)";
+    const textColor = isQ ? "rgba(13,155,126,0.7)" : "rgba(255,255,255,0.55)";
+    html += `<div style="position:absolute;left:${pos.x}%;top:${pos.y}%;background:${bg};border:${border};border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;color:${textColor};white-space:nowrap;animation:${anim} ${dur}s ${delay}s ease-in-out infinite;pointer-events:none;max-width:200px;backdrop-filter:blur(4px)">${b.text}</div>`;
+  });
+  return html;
+}
+
 // ══════════════════════════════════════════════════════════════
 // BIBI FACE SVG (animated)
 // ══════════════════════════════════════════════════════════════
@@ -228,6 +296,30 @@ function detectTopic(t){
   return "Genel";
 }
 
+// Sokratik ödev sinyalleri — bu kelimeler geçiyorsa "homework mode" aktif olur
+const HOMEWORK_SIGNALS = ["ödev","nasıl çözülür","nasıl yapılır","cevap nedir","sonuç ne","bul","hesapla","çöz"];
+function isHomeworkQuestion(t){
+  const l=t.toLowerCase();
+  return HOMEWORK_SIGNALS.some(w=>l.includes(w));
+}
+
+// Ustalık skoru — her konuda mesaj attıkça yavaşça artar (basit, kademeli model)
+async function updateMastery(childId, topic){
+  if(topic==="Genel") return;
+  try{
+    const {data:existing} = await sb.from("mastery").select("*").eq("child_id",childId).eq("topic",topic).single();
+    if(existing){
+      const newScore = Math.min(100, existing.score + 2);
+      await sb.from("mastery").update({score:newScore, message_count:existing.message_count+1, updated_at:new Date().toISOString()}).eq("id",existing.id);
+    } else {
+      await sb.from("mastery").insert({child_id:childId, topic, score:8, message_count:1});
+    }
+  }catch(e){
+    // mastery tablosu yoksa veya satır bulunamazsa sessizce devam et
+    await sb.from("mastery").insert({child_id:childId, topic, score:8, message_count:1}).then(()=>{}).catch(()=>{});
+  }
+}
+
 function buildPrompt(child){
   const tone = child.age<=8
     ? "Çok kısa cümleler kur. Somut örnekler ver. Bol emoji kullan 😊 Oyunlaştır her şeyi."
@@ -237,8 +329,19 @@ function buildPrompt(child){
   return `Sen Bibi'sin — ${child.age} yaşında ${gender} çocuk olan ${child.name} için özel AI öğrenme arkadaşısın.
 Sınıfı: ${child.grade||"?"} 
 Kişiliğin: Sıcak, sabırlı, meraklı. Asla "yanlış" demezsin, "yaklaştın!" dersin. Her cevabının sonunda soru sorarsın. ${tone}
-Dil: Türkçe. Çocuk başka dil yazarsa o dilde yanıt ver.
-Güvenlik: Kişisel bilgi sorma. Üzgün göründüğünde nazikçe yönlendir.
+
+ÖDEV YARDIMI KURALI (ÇOK ÖNEMLİ — SOKRATİK YÖNTEM):
+Çocuk bir ödev sorusu veya matematik/fen problemi sorduğunda ASLA direkt cevabı verme.
+Bunun yerine:
+1. Önce çocuğun problemi nasıl anladığını sor ("Sence bu soru bize ne soruyor?")
+2. Küçük adımlara böl, her adımda bir soru sor
+3. Çocuk bir adımda takılırsa ipucu ver ama cevabı söyleme
+4. Çocuk kendi kendine doğru cevaba ulaşınca büyük bir coşkuyla kutla
+5. Sadece çocuk 3 kez denedikten sonra hâlâ bulamazsa, çok yakın bir ipucu ver (yine de tam cevabı verme)
+Örnek: Çocuk "7x8 kaç eder?" diye sorarsa, direkt "56" deme. "7'yi 8 kere toplasak ne olur? Önce 7x4'ü bulalım mı?" gibi sorularla yönlendir.
+
+DİL: Türkçe. Çocuk başka dil yazarsa o dilde yanıt ver.
+GÜVENLİK: Kişisel bilgi sorma. Üzgün göründüğünde nazikçe yönlendir.
 Kısa ve odaklı cevaplar ver. Çok uzun paragraflar yazma.`;
 }
 
@@ -391,6 +494,10 @@ function screenAuth(){
             <option value="yukseklisans">Yüksek Lisans / Doktora</option>
           </select>
           <input class="inp-dark" id="r-job" placeholder="Mesleğiniz (isteğe bağlı)"/>
+          <div style="margin-top:6px">
+            <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700;margin-bottom:6px">🔒 Veli PIN'i (raporları korur)</div>
+            <input class="inp-dark" id="r-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="4 haneli PIN belirleyin" style="letter-spacing:8px;text-align:center;font-size:20px;font-weight:800" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)"/>
+          </div>
           <div id="reg-msg-2" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
           <div style="display:flex;gap:8px">
             <button onclick="showStep(1)" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">← Geri</button>
@@ -542,9 +649,11 @@ async function verifyRegOTP(){
 function regStep2Next(){
   const name=el("r-name")?.value.trim(), role=el("r-role")?.value;
   const ageRange=el("r-age-range")?.value, edu=el("r-edu")?.value;
+  const pin=el("r-pin")?.value.trim();
   if(!name||!role||!ageRange||!edu){ showMsg("reg-msg-2","Lütfen zorunlu alanları doldurun.","err"); return; }
+  if(!pin||pin.length!==4){ showMsg("reg-msg-2","Lütfen 4 haneli bir PIN belirleyin (raporları korur).","err"); return; }
   regData.full_name=name; regData.role=role; regData.age_range=ageRange;
-  regData.education=edu; regData.job=el("r-job")?.value.trim()||"";
+  regData.education=edu; regData.job=el("r-job")?.value.trim()||""; regData.pin=pin;
   showStep(3);
 }
 
@@ -564,7 +673,7 @@ async function regComplete(){
       id:user.id, email:user.email||regData.phone,
       full_name:regData.full_name, phone:regData.phone||null,
       role:regData.role, age_range:regData.age_range,
-      education:regData.education, job:regData.job
+      education:regData.education, job:regData.job, pin:regData.pin
     });
     await sb.from("children").insert({
       parent_id:user.id, name:cname, age:parseInt(cage),
@@ -616,6 +725,10 @@ function screenCompleteProfile(existing){
           ${[["ilkokul","İlkokul"],["ortaokul","Ortaokul"],["lise","Lise"],["onlisans","Ön Lisans"],["lisans","Lisans"],["yukseklisans","Yüksek Lisans / Doktora"]].map(([v,l])=>`<option value="${v}" ${existing?.education===v?"selected":""}>${l}</option>`).join("")}
         </select>
         <input class="inp-dark" id="cp-job" placeholder="Mesleğiniz (isteğe bağlı)" value="${existing?.job||''}"/>
+        <div style="margin-top:6px">
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700;margin-bottom:6px">🔒 Veli PIN'i (raporları korur)</div>
+          <input class="inp-dark" id="cp-pin" type="tel" inputmode="numeric" maxlength="4" placeholder="4 haneli PIN belirleyin" value="${existing?.pin||''}" style="letter-spacing:8px;text-align:center;font-size:20px;font-weight:800" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)"/>
+        </div>
         <div id="cp-msg" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
         <button onclick="saveCompleteProfile()" class="btn-primary">Kaydet ve Devam Et →</button>
         <button onclick="screenChildren()" style="background:transparent;border:none;color:rgba(255,255,255,.4);font-size:13px;cursor:pointer;padding:6px">Şimdi atla →</button>
@@ -627,15 +740,192 @@ function screenCompleteProfile(existing){
 async function saveCompleteProfile(){
   const name=el("cp-name")?.value.trim(), role=el("cp-role")?.value;
   const age=el("cp-age")?.value, edu=el("cp-edu")?.value, job=el("cp-job")?.value.trim();
+  const pin=el("cp-pin")?.value.trim();
   if(!name||!role||!age||!edu){ showMsg("cp-msg","Lütfen zorunlu alanları doldurun.","err"); return; }
+  if(!pin||pin.length!==4){ showMsg("cp-msg","Lütfen 4 haneli bir PIN belirleyin.","err"); return; }
   const btn=document.querySelector('[onclick="saveCompleteProfile()"]');
   if(btn){ btn.textContent="Kaydediliyor..."; btn.disabled=true; }
   const {error} = await sb.from("parents").upsert({
     id:currentUser.id, email:currentUser.email||null,
-    full_name:name, role, age_range:age, education:edu, job:job||""
+    full_name:name, role, age_range:age, education:edu, job:job||"", pin
   });
   if(error){ showMsg("cp-msg","Hata: "+error.message,"err"); if(btn){btn.textContent="Kaydet ve Devam Et →";btn.disabled=false;} return; }
   screenChildren();
+}
+
+// ── PIN Kilidi (Çocuk raporlara erişemesin) ───────────────────
+let pinTarget = null, pinEntry = "";
+
+async function screenPinLock(child){
+  if(typeof child==="string") child=JSON.parse(child);
+  pinTarget = child; pinEntry = "";
+
+  const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
+  if(!parent?.pin){
+    // PIN hiç belirlenmemişse direkt rapora izin ver (geriye dönük uyumluluk)
+    screenReport(child); return;
+  }
+
+  render(`
+  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#1A2E2A 0%,#243d38 100%);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
+    ${floatingBibis(6,["#0D9B7E"])}
+    <div style="width:100%;max-width:340px;position:relative;z-index:10;text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:48px;margin-bottom:10px">🔒</div>
+      <div style="color:white;font-size:19px;font-weight:900;margin-bottom:4px">Veli Alanı</div>
+      <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:24px">${child.name}'in gelişim raporunu görmek için PIN girin</div>
+
+      <div id="pin-dots" style="display:flex;gap:14px;justify-content:center;margin-bottom:28px">
+        ${[0,1,2,3].map(i=>`<div id="pin-dot-${i}" style="width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:transparent;transition:all .15s"></div>`).join("")}
+      </div>
+
+      <div id="pin-err" style="display:none;color:#fca88a;font-size:13px;font-weight:700;margin-bottom:16px">Yanlış PIN, tekrar dene 🙈</div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="pinPress('${n}')" style="aspect-ratio:1;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:white;font-size:20px;font-weight:800;cursor:pointer">${n}</button>`).join("")}
+        <div></div>
+        <button onclick="pinPress('0')" style="aspect-ratio:1;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:white;font-size:20px;font-weight:800;cursor:pointer">0</button>
+        <button onclick="pinBackspace()" style="aspect-ratio:1;border-radius:50%;border:none;background:transparent;color:rgba(255,255,255,.5);font-size:18px;cursor:pointer">⌫</button>
+      </div>
+
+      <button onclick="screenChildren()" style="margin-top:24px;background:transparent;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer">← Vazgeç</button>
+    </div>
+  </div>`);
+}
+
+function pinPress(digit){
+  if(pinEntry.length>=4) return;
+  pinEntry += digit;
+  const dot = el(`pin-dot-${pinEntry.length-1}`);
+  if(dot){ dot.style.background="white"; dot.style.borderColor="white"; }
+  if(pinEntry.length===4) setTimeout(checkPin, 150);
+}
+
+function pinBackspace(){
+  if(pinEntry.length===0) return;
+  const dot = el(`pin-dot-${pinEntry.length-1}`);
+  if(dot){ dot.style.background="transparent"; dot.style.borderColor="rgba(255,255,255,.3)"; }
+  pinEntry = pinEntry.slice(0,-1);
+}
+
+async function checkPin(){
+  const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
+  if(parent?.pin === pinEntry){
+    screenReport(pinTarget);
+  } else {
+    const err = el("pin-err"); if(err) err.style.display="block";
+    [0,1,2,3].forEach(i=>{ const d=el(`pin-dot-${i}`); if(d){d.style.background="transparent";d.style.borderColor="rgba(255,255,255,.3)";} });
+    pinEntry = "";
+    const wrap = el("pin-dots"); if(wrap){ wrap.style.animation="none"; setTimeout(()=>wrap.style.animation="",10); }
+  }
+}
+
+// ── Gelişim Raporu (Ebeveyn Paneli) ───────────────────────────
+const TOPIC_ICONS = {"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
+const TOPIC_COLORS = {"Matematik":"#2563EB","Fen":"#16A34A","Dil":"#9333EA","Tarih":"#EA580C","Genel":"#6B7280"};
+
+async function screenReport(child){
+  if(typeof child==="string") child=JSON.parse(child);
+  render(`<div style="min-height:100vh;width:100%;background:#F8FBFA;display:flex;align-items:center;justify-content:center">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      ${bibiFaceSVG("thinking",70)}
+      <div style="color:#6B7280;font-size:14px;font-weight:600">Rapor hazırlanıyor...</div>
+    </div>
+  </div>`);
+
+  const [{data:mastery=[]},{data:sessions=[]}] = await Promise.all([
+    sb.from("mastery").select("*").eq("child_id",child.id).order("score",{ascending:false}),
+    sb.from("sessions").select("*").eq("child_id",child.id).order("started_at",{ascending:false}).limit(10)
+  ]);
+
+  const totalMinutes = sessions.reduce((s,x)=>s+(x.duration_mins||0),0);
+  const totalMessages = sessions.reduce((s,x)=>s+(x.message_count||0),0);
+  const avgScore = mastery.length ? Math.round(mastery.reduce((s,m)=>s+m.score,0)/mastery.length) : 0;
+  const topTopic = mastery[0]?.topic || "Henüz yok";
+
+  render(`
+  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#f0f7f5 0%,#F8FBFA 100%)">
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#1A2E2A,#243d38);padding:20px 20px 26px;position:sticky;top:0;z-index:10">
+      <div style="max-width:480px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="color:rgba(255,255,255,.55);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Gelişim Raporu</div>
+          <div style="color:white;font-size:21px;font-weight:900;margin-top:2px">${child.name} ${child.gender==="kız"?"👧":"👦"}</div>
+        </div>
+        <button onclick="screenChildren()" style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);border-radius:20px;padding:8px 16px;color:white;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Geri
+        </button>
+      </div>
+    </div>
+
+    <div style="max-width:480px;margin:0 auto;padding:20px 16px 50px">
+      <!-- Stat cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
+        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+          <div style="font-size:20px">⏱️</div>
+          <div style="font-size:21px;font-weight:900;color:#2563EB;margin-top:4px">${totalMinutes}</div>
+          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Dakika</div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+          <div style="font-size:20px">💬</div>
+          <div style="font-size:21px;font-weight:900;color:#0D9B7E;margin-top:4px">${totalMessages}</div>
+          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Mesaj</div>
+        </div>
+        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+          <div style="font-size:20px">🎯</div>
+          <div style="font-size:21px;font-weight:900;color:#7C3AED;margin-top:4px">%${avgScore}</div>
+          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Ort. Ustalık</div>
+        </div>
+      </div>
+
+      <!-- Top topic highlight -->
+      ${mastery.length ? `
+      <div style="background:white;border-radius:16px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px">
+        <div style="width:46px;height:46px;border-radius:12px;background:${TOPIC_COLORS[topTopic]||'#6B7280'}22;display:flex;align-items:center;justify-content:center;font-size:22px">${TOPIC_ICONS[topTopic]||'🌍'}</div>
+        <div>
+          <div style="font-size:11px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:1px">En güçlü konu</div>
+          <div style="font-size:17px;font-weight:800;color:#1A2E2A;margin-top:2px">${topTopic}</div>
+        </div>
+      </div>` : ''}
+
+      <!-- Mastery bars -->
+      <div style="background:white;border-radius:16px;padding:20px 18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:16px">📊 Konu Bazlı Ustalık</div>
+        ${mastery.length === 0 ? `
+        <div style="text-align:center;color:#9CA3AF;font-size:13px;padding:24px 0">
+          Henüz veri yok.<br/>${child.name} Bibi ile konuştukça burada gelişimi görünecek 🌱
+        </div>` : mastery.map(m => `
+        <div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
+            <span style="font-size:13px;font-weight:700;color:#1A2E2A;display:flex;align-items:center;gap:6px">${TOPIC_ICONS[m.topic]||'🌍'} ${m.topic}</span>
+            <span style="font-size:12px;color:${TOPIC_COLORS[m.topic]||'#6B7280'};font-weight:800">%${m.score}</span>
+          </div>
+          <div style="height:8px;background:#f3f4f6;border-radius:8px;overflow:hidden">
+            <div style="height:100%;width:${m.score}%;background:${TOPIC_COLORS[m.topic]||'#6B7280'};border-radius:8px;transition:width .6s ease"></div>
+          </div>
+          <div style="font-size:11px;color:#9CA3AF;margin-top:3px">${m.message_count} etkileşim</div>
+        </div>`).join("")}
+      </div>
+
+      <!-- Recent sessions -->
+      <div style="background:white;border-radius:16px;padding:20px 18px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:14px">🕐 Son Oturumlar</div>
+        ${sessions.length === 0 ? `
+        <div style="text-align:center;color:#9CA3AF;font-size:13px;padding:16px 0">Henüz oturum yok</div>` :
+        sessions.slice(0,5).map(s => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#1A2E2A">${new Date(s.started_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}</div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:2px">${new Date(s.started_at).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:13px;font-weight:700;color:#0D9B7E">${s.duration_mins||0} dk</div>
+            <div style="font-size:11px;color:#9CA3AF;margin-top:2px">${s.message_count||0} mesaj</div>
+          </div>
+        </div>`).join("")}
+      </div>
+    </div>
+  </div>`);
 }
 
 async function screenChildren(){
@@ -644,11 +934,12 @@ async function screenChildren(){
     sb.from("parents").select("full_name").eq("id",currentUser.id).single()
   ]);
   const parentDisplay = parentData?.full_name || currentUser?.email || "";
+  const bubblesBg = floatingBubbles(list||[]);
   const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
 
   render(`
   <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
-    ${floatingBibis(10,["#0D9B7E","#7C3AED","#F4845F","#2563EB"])}
+    ${bubblesBg}
     <div style="position:relative;z-index:2;padding:28px 20px 60px;max-width:500px;margin:0 auto">
       <!-- Header -->
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
@@ -670,6 +961,7 @@ async function screenChildren(){
             <div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div>
             <div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaş · ${c.grade||""} · ${c.gender==="kız"?"Kız":"Erkek"}</div>
           </div>
+          <button onclick="event.stopPropagation();screenPinLock(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:32px;height:32px;border-radius:50%;background:#e8f7f3;border:1px solid #c5e8e0;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center" title="Gelişim Raporu">📊</button>
           <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:32px;height:32px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">🗑️</button>
           <div style="font-size:22px;color:#d1d5db">›</div>
         </div>`).join("")}
@@ -855,7 +1147,10 @@ async function sendMessage(){
   addMsg("user",text);
   setExpr("thinking"); setStatus("Düşünüyor...","#fbbf24");
   addTyping();
-  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic:detectTopic(text),language:"tr"});
+  const topic = detectTopic(text);
+  const homeworkMode = isHomeworkQuestion(text);
+  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic,language:"tr"});
+  updateMastery(currentChild.id, topic);
   try{
     const res=await fetch(OPENROUTER_URL,{
       method:"POST",
