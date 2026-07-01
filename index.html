@@ -321,28 +321,109 @@ async function updateMastery(childId, topic){
 }
 
 function buildPrompt(child){
-  const tone = child.age<=8
-    ? "Çok kısa cümleler kur. Somut örnekler ver. Bol emoji kullan 😊 Oyunlaştır her şeyi."
-    : child.age<=12 ? "Dengeli açıklamalar yap. Analoji ve hikayeler kullan."
-    : "Neredeyse akran gibi konuş. Az emoji. Daha derin açıklamalar.";
-  const gender = child.gender==="kız" ? "kız" : "erkek";
-  return `Sen Bibi'sin — ${child.age} yaşında ${gender} çocuk olan ${child.name} için özel AI öğrenme arkadaşısın.
-Sınıfı: ${child.grade||"?"} 
-Kişiliğin: Sıcak, sabırlı, meraklı. Asla "yanlış" demezsin, "yaklaştın!" dersin. Her cevabının sonunda soru sorarsın. ${tone}
+  const age = child.age || 9;
+  const name = child.name || "sevgili";
+  const gender = child.gender === "kız" ? "kız" : "erkek";
+  const grade = child.grade || "?";
 
-ÖDEV YARDIMI KURALI (ÇOK ÖNEMLİ — SOKRATİK YÖNTEM):
-Çocuk bir ödev sorusu veya matematik/fen problemi sorduğunda ASLA direkt cevabı verme.
-Bunun yerine:
-1. Önce çocuğun problemi nasıl anladığını sor ("Sence bu soru bize ne soruyor?")
-2. Küçük adımlara böl, her adımda bir soru sor
-3. Çocuk bir adımda takılırsa ipucu ver ama cevabı söyleme
-4. Çocuk kendi kendine doğru cevaba ulaşınca büyük bir coşkuyla kutla
-5. Sadece çocuk 3 kez denedikten sonra hâlâ bulamazsa, çok yakın bir ipucu ver (yine de tam cevabı verme)
-Örnek: Çocuk "7x8 kaç eder?" diye sorarsa, direkt "56" deme. "7'yi 8 kere toplasak ne olur? Önce 7x4'ü bulalım mı?" gibi sorularla yönlendir.
+  // ── Yaş grubuna göre KİŞİLİK ve TON ─────────────────────────
+  let ageProfile = "";
 
-DİL: Türkçe. Çocuk başka dil yazarsa o dilde yanıt ver.
-GÜVENLİK: Kişisel bilgi sorma. Üzgün göründüğünde nazikçe yönlendir.
-Kısa ve odaklı cevaplar ver. Çok uzun paragraflar yazma.`;
+  if(age <= 8){
+    ageProfile = `
+YAŞ GRUBU: Küçük Çocuk (4-8 yaş)
+KONUŞMA TARZI:
+• Cümleler çok kısa — maksimum 1-2 cümle
+• Kelimeler basit, günlük hayattan
+• Her mesajda 2-3 emoji kullan (ama aşırıya kaçma)
+• Seslendirmeli, neşeli, oyunsu bir ton
+• Övgü çok önemli: "Vay be! Süpersin! 🌟", "Harika düşündün! 🎉"
+• Konuları somut örneklerle anlat: "Mesela elmalar gibi düşün 🍎"
+• Hikaye ve oyun çerçevesi kullan: "Şimdi ikimiz kaşifiz, hazır mısın?"
+• Her cevabı eğlenceli bir soruyla bitir
+
+ÖRNEK KONUŞMA TARZI:
+Çocuk: "2+2 kaç?"
+Sen: "Hadi birlikte sayalım! 🤩 Elinde 2 top var. 2 tane daha aldın. Hepsini say bakalım! 🎈"`
+
+  } else if(age <= 12){
+    ageProfile = `
+YAŞ GRUBU: Orta Çocuk (9-12 yaş)
+KONUŞMA TARZI:
+• Cümleler biraz daha uzun ama hâlâ sade — 2-4 cümle
+• Analoji ve hikayeler kullan: "Atomlar küçücük lego parçaları gibi"
+• Mesajda 1 emoji yeterli, fazlası saçma görünür
+• Merakı kışkırt: "Peki sence neden böyle olur?"
+• Başarıyı kutla ama abartma: "Güzel düşündün!", "Aynen öyle!"
+• Konuları günlük hayatla ilişkilendir
+• Çocuğun seviyesini test et, zor gelirse basitleştir
+
+ÖRNEK KONUŞMA TARZI:
+Çocuk: "Fotosentez nedir?"
+Sen: "Bitkiler güneş ışığını yiyeceğe çevirir — sanki kendi mutfakları var! 🌿 Peki sence bitki bu yiyeceği nasıl üretir?"`
+
+  } else {
+    ageProfile = `
+YAŞ GRUBU: Genç (13-15 yaş)
+KONUŞMA TARZI:
+• Neredeyse akran gibi konuş — samimi, doğal, saygılı
+• Emoji çok az — sadece vurgu için, mesajda en fazla 1 tane
+• Daha derin, analitik açıklamalar yap
+• Gençlerin ilgi alanlarına bağlan: teknoloji, müzik, sosyal konular
+• Eleştirel düşünmeyi teşvik et: "Sen ne düşünüyorsun?"
+• Gereksiz yere basitleştirme — zekalarını hafife alma
+• Kariyer, gelecek, hedefler hakkında sohbet açabilirsin
+
+ÖRNEK KONUŞMA TARZI:
+Çocuk: "Kara delik nedir?"
+Sen: "Kütlesi o kadar yoğun ki ışık bile kaçamıyor. Einstein'ın genel göreliliği bunu 1915'te öngördü — ama ilk fotoğrafı ancak 2019'da çekebildik. Peki sence neden bu kadar uzun sürdü?"`
+  }
+
+  return `Sen Bibi'sin — ${age} yaşında ${gender} çocuk olan ${name} için özel AI öğrenme arkadaşısın.
+${name}'in sınıfı: ${grade}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+KİMLİĞİN
+━━━━━━━━━━━━━━━━━━━━━━━━
+• Adın Bibi. ${name}'in öğrenme arkadaşısın.
+• ASLA "Merhaba! Ben Bibi..." diye başlama — zaten tanışıyorsunuz.
+• Konuşmanın başında ya da ortasında kendini tanıtma.
+• Sadece doğrudan konuya gir veya soruyu yanıtla.
+• ${name} sana "kim/ne" diye sorarsa kısaca: "Ben Bibi, seninle öğrenmek için buradayım 😊"
+
+${ageProfile}
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+TEMEL KURALLAR
+━━━━━━━━━━━━━━━━━━━━━━━━
+• Asla "yanlış" veya "hata yaptın" deme → "Yaklaştın!", "Neredeyse!" de
+• Her cevabının sonunda bir soru sor (çok önemli)
+• Cevaplar kısa ve odaklı — uzun paragraflar yazma
+• Aynı cümleyi veya ifadeyi tekrar etme
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+SOKRATİK ÖDEV KURALI
+━━━━━━━━━━━━━━━━━━━━━━━━
+Çocuk bir ödev sorusu, matematik veya fen problemi sorduğunda ASLA direkt cevabı verme.
+1. "Sence bu soruda ne soruyorlar?" diye sor
+2. Adım adım yönlendir, ipuçları ver
+3. Çocuk 3 kez denedikten sonra hâlâ bulamazsa çok yakın ipucu ver
+4. Bulunca coşkuyla kutla!
+Örnek: "7x8 kaç?" → "7'yi 8 kere toplarsak ne çıkar? Önce 7x4'ü bul bakalım 🤔"
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+DİL
+━━━━━━━━━━━━━━━━━━━━━━━━
+• Varsayılan: Türkçe
+• ${name} Arapça yazarsa → Arapça yanıtla
+• ${name} İngilizce yazarsa → İngilizce yanıtla
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+GÜVENLİK
+━━━━━━━━━━━━━━━━━━━━━━━━
+• Adres, okul adı, aile bilgisi sorma ve alma
+• Üzgün/korkmuş görünürse: "Bunu duymak beni üzdü. Seni desteklemek için yanındayım 💙 Ama bu konuda bir büyüğün çok daha iyi yardım edebilir"
+• Zararlı içerik taleplerini nazikçe reddet`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -753,6 +834,83 @@ async function saveCompleteProfile(){
   screenChildren();
 }
 
+// ── PIN Belirleme (ilk kez) ───────────────────────────────────
+let setPinTarget = null, setPinEntry = "", setPinConfirm = "", setPinStep = 1;
+
+async function screenSetPin(child){
+  setPinTarget = child; setPinEntry = ""; setPinConfirm = ""; setPinStep = 1;
+  renderSetPin();
+}
+
+function renderSetPin(){
+  R.innerHTML = `
+  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#1A2E2A 0%,#243d38 100%);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
+    ${floatingBibis(4,["#0D9B7E"])}
+    <div style="width:100%;max-width:340px;position:relative;z-index:10;text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:44px;margin-bottom:10px">🔐</div>
+      <div style="color:white;font-size:19px;font-weight:900;margin-bottom:4px">
+        ${setPinStep===1 ? "Veli PIN'i Belirleyin" : "PIN'i Tekrar Girin"}
+      </div>
+      <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:24px">
+        ${setPinStep===1 ? "Raporlar bu PIN ile korunacak — çocuklar giremez" : "Güvenlik için PIN'i onaylayın"}
+      </div>
+
+      <div id="setpin-dots" style="display:flex;gap:14px;justify-content:center;margin-bottom:28px">
+        ${[0,1,2,3].map(i=>`<div id="setpin-dot-${i}" style="width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);background:transparent;transition:all .15s"></div>`).join("")}
+      </div>
+
+      <div id="setpin-err" style="display:none;color:#fca88a;font-size:13px;font-weight:700;margin-bottom:16px">PIN'ler eşleşmedi, tekrar dene</div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:260px;margin:0 auto">
+        ${[1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="setPinPress('${n}')" style="aspect-ratio:1;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:white;font-size:20px;font-weight:800;cursor:pointer">${n}</button>`).join("")}
+        <div></div>
+        <button onclick="setPinPress('0')" style="aspect-ratio:1;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:white;font-size:20px;font-weight:800;cursor:pointer">0</button>
+        <button onclick="setPinBackspace()" style="aspect-ratio:1;border-radius:50%;border:none;background:transparent;color:rgba(255,255,255,.5);font-size:18px;cursor:pointer">⌫</button>
+      </div>
+      <button onclick="screenChildren()" style="margin-top:24px;background:transparent;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer">← Vazgeç</button>
+    </div>
+  </div>`;
+}
+
+function setPinPress(digit){
+  const current = setPinStep===1 ? setPinEntry : setPinConfirm;
+  if(current.length>=4) return;
+  const newVal = current + digit;
+  if(setPinStep===1) setPinEntry=newVal; else setPinConfirm=newVal;
+  const dot = document.getElementById(`setpin-dot-${newVal.length-1}`);
+  if(dot){ dot.style.background="white"; dot.style.borderColor="white"; }
+  if(newVal.length===4) setTimeout(setPinNext, 150);
+}
+
+function setPinBackspace(){
+  const current = setPinStep===1 ? setPinEntry : setPinConfirm;
+  if(current.length===0) return;
+  const dot = document.getElementById(`setpin-dot-${current.length-1}`);
+  if(dot){ dot.style.background="transparent"; dot.style.borderColor="rgba(255,255,255,.3)"; }
+  if(setPinStep===1) setPinEntry=setPinEntry.slice(0,-1);
+  else setPinConfirm=setPinConfirm.slice(0,-1);
+}
+
+async function setPinNext(){
+  if(setPinStep===1){
+    // Adım 2: onay
+    setPinStep=2; setPinConfirm="";
+    renderSetPin();
+  } else {
+    // Onayla
+    if(setPinEntry !== setPinConfirm){
+      const err=document.getElementById("setpin-err"); if(err) err.style.display="block";
+      [0,1,2,3].forEach(i=>{ const d=document.getElementById(`setpin-dot-${i}`); if(d){d.style.background="transparent";d.style.borderColor="rgba(255,255,255,.3)";} });
+      setPinConfirm=""; setPinStep=1; setPinEntry="";
+      setTimeout(renderSetPin, 800); return;
+    }
+    // Kaydet
+    await sb.from("parents").update({pin:setPinEntry}).eq("id",currentUser.id);
+    // Artık PIN ekranına yönlendir
+    screenPinLock(setPinTarget);
+  }
+}
+
 // ── PIN Kilidi (Çocuk raporlara erişemesin) ───────────────────
 let pinTarget = null, pinEntry = "";
 
@@ -762,8 +920,8 @@ async function screenPinLock(child){
 
   const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
   if(!parent?.pin){
-    // PIN hiç belirlenmemişse direkt rapora izin ver (geriye dönük uyumluluk)
-    screenReport(child); return;
+    // PIN belirlenmemişse önce PIN belirleme ekranı göster
+    screenSetPin(child); return;
   }
 
   render(`
@@ -1065,12 +1223,24 @@ function startChat(child){
       <!-- Messages -->
       <div id="messages" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;background:rgba(255,255,255,.04);backdrop-filter:blur(8px)"></div>
 
-      <!-- Quick prompts -->
+      <!-- Quick prompts — yaşa göre -->
       <div id="quick-prompts" style="padding:6px 16px 6px;display:flex;gap:6px;flex-wrap:wrap;background:rgba(255,255,255,.04)">
-        <button class="chip" onclick="setInput('Matematik ödev yardımı 📐')">Matematik ödev 📐</button>
-        <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü neden mavi? 🌤️</button>
-        <button class="chip" onclick="setInput('Hikaye anlat 📖')">Hikaye anlat 📖</button>
-        <button class="chip" onclick="setInput('Yeni kelime öğret 🔤')">Kelime öğret 🔤</button>
+        ${child.age<=8 ? `
+          <button class="chip" onclick="setInput('Bana hikaye anlat! 📖')">Hikaye anlat 📖</button>
+          <button class="chip" onclick="setInput('Hayvanlar hakkında bir şey söyle 🐾')">Hayvanlar 🐾</button>
+          <button class="chip" onclick="setInput('Rakamları öğrenelim 🔢')">Sayılar 🔢</button>
+          <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü 🌤️</button>
+        ` : child.age<=12 ? `
+          <button class="chip" onclick="setInput('Ödev yardımı lazım 📐')">Ödev yardımı 📐</button>
+          <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü neden mavi? 🌤️</button>
+          <button class="chip" onclick="setInput('Uzay hakkında anlat 🚀')">Uzay 🚀</button>
+          <button class="chip" onclick="setInput('Kelime öğret 🔤')">Kelime öğret 🔤</button>
+        ` : `
+          <button class="chip" onclick="setInput('Yapay zeka nasıl çalışır?')">Yapay zeka</button>
+          <button class="chip" onclick="setInput('Üniversite için ne yapmalıyım?')">Üniversite</button>
+          <button class="chip" onclick="setInput('Kitap önerisi lazım')">Kitap önerisi</button>
+          <button class="chip" onclick="setInput('Girişimcilik nasıl öğrenilir?')">Girişimcilik</button>
+        `}
       </div>
 
       <!-- Input bar -->
@@ -1091,7 +1261,13 @@ function startChat(child){
 
   // Start session & first message
   sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{ if(data) sessionId=data.id; });
-  addMsg("bibi", `Merhaba ${child.name}! 👋 Ben Bibi — seninle öğrenmek için buradayım. Bugün ne hakkında konuşmak istersin? 🌟`);
+  // Yaşa göre kişiselleştirilmiş açılış mesajı
+  const openMsg = child.age<=8
+    ? `Heyyyy ${child.name}! 🎉 Bugün benimle ne öğrenmek istersin?`
+    : child.age<=12
+    ? `Merhaba ${child.name}! Bugün ne keşfetmek istersin? 🌍`
+    : `Selam ${child.name}. Bugün ne konuşacağız?`;
+  addMsg("bibi", openMsg);
 }
 
 function setExpr(expr){
@@ -1183,7 +1359,17 @@ async function goBack(){
 // ── VOICE ─────────────────────────────────────────────────────
 function speak(text){
   if(!voiceOn||!window.speechSynthesis) return;
-  const clean=text.replace(/[\u{1F000}-\u{1FFFF}]/gu,"").trim();
+  // Tüm emoji, özel karakter ve semboller temizlenir
+  let clean = text
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu,"")   // emoji blok 1
+    .replace(/[\u{2600}-\u{27BF}]/gu,"")      // semboller (☀️ ✨ vb)
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu,"")   // emoji blok 2
+    .replace(/[\u2702-\u27B0]/gu,"")
+    .replace(/[★☆♥♦♣♠•◦▪▫►◄▲▼]/g,"")
+    .replace(/━+/g," ")                        // yatay çizgiler
+    .replace(/[🌟👋📐🌤️📖🔤💙🙈😅🎙️🎤🤖🧠🔬📚⚽🎮🔭🌿🍎🎈🎉🌈]/g,"")
+    .replace(/\s+/g," ")
+    .trim();
   window.speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(clean);
   u.lang="tr-TR"; u.rate=0.9; u.pitch=1.2;
