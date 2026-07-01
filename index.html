@@ -1194,78 +1194,75 @@ function startChat(child){
   if(typeof child==="string") child=JSON.parse(child);
   currentChild=child; messages=[]; sessionStart=new Date();
   const theme=getTheme(child);
+  const miniSize = 36; // Bibi mini boyutu mesaj yanında
 
   render(`
-  <div style="width:100%;min-height:100vh;display:flex;align-items:center;justify-content:center;background:${theme.bg};position:relative;overflow:hidden">
-    ${floatingBibis(6, theme.colors)}
-    ${theme.stars?`<div id="stars" style="position:absolute;inset:0;pointer-events:none;overflow:hidden">${Array.from({length:20},(_,i)=>`<div style="position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:white;animation:starTwinkle ${1+Math.random()*2}s ${Math.random()*2}s ease-in-out infinite"></div>`).join("")}</div>`:""}
-    <div style="width:100%;max-width:420px;height:100vh;display:flex;flex-direction:column;position:relative;z-index:2">
+  <div style="width:100%;height:100vh;display:flex;flex-direction:column;background:${theme.bg};position:relative;overflow:hidden">
+    ${floatingBibis(4, theme.colors)}
+    ${theme.stars?`<div style="position:absolute;inset:0;pointer-events:none;overflow:hidden">${Array.from({length:15},(_,i)=>`<div style="position:absolute;left:${Math.random()*100}%;top:${Math.random()*100}%;width:${2+Math.random()*3}px;height:${2+Math.random()*3}px;border-radius:50%;background:white;animation:starTwinkle ${1+Math.random()*2}s ${Math.random()*2}s ease-in-out infinite"></div>`).join("")}</div>`:""}
 
-      <!-- Header -->
-      <div id="chat-header" style="background:${theme.header};padding:18px 16px 22px;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;flex-shrink:0">
-        <button onclick="goBack()" style="position:absolute;top:14px;left:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </button>
-        <button onclick="toggleVoice()" id="voice-btn" style="position:absolute;top:14px;right:14px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.3);cursor:pointer;display:flex;align-items:center;justify-content:center">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-        </button>
-        <div id="bibi-face-wrap" style="position:relative">${bibiFaceSVG("idle",110)}</div>
-        <div style="text-align:center">
-          <div style="color:white;font-size:19px;font-weight:900">bibi</div>
-          <div style="color:rgba(255,255,255,.65);font-size:11px;margin-top:2px">${child.name} ile konuşuyor</div>
-          <div style="display:flex;align-items:center;gap:5px;justify-content:center;margin-top:4px">
-            <span id="status-dot" style="width:7px;height:7px;border-radius:50%;background:#4ade80;display:inline-block;transition:background .3s"></span>
-            <span id="status-text" style="color:rgba(255,255,255,.6);font-size:11px;font-weight:600">Seninle burada!</span>
-          </div>
+    <!-- Compact Header -->
+    <div style="background:${theme.header};padding:12px 16px;display:flex;align-items:center;gap:10px;position:relative;z-index:5;flex-shrink:0;box-shadow:0 2px 12px rgba(0,0,0,.15)">
+      <button onclick="goBack()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <!-- Mini Bibi avatar in header -->
+      <div id="bibi-face-wrap" style="flex-shrink:0;animation:breathe 3.5s ease-in-out infinite">${bibiFaceSVG("idle",44)}</div>
+      <div style="flex:1">
+        <div style="color:white;font-size:15px;font-weight:900;line-height:1">bibi</div>
+        <div style="display:flex;align-items:center;gap:4px;margin-top:2px">
+          <span id="status-dot" style="width:6px;height:6px;border-radius:50%;background:#4ade80;display:inline-block;transition:background .3s"></span>
+          <span id="status-text" style="color:rgba(255,255,255,.6);font-size:11px;font-weight:600">${child.name} ile</span>
         </div>
       </div>
+      <button onclick="toggleVoice()" id="voice-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
 
-      <!-- Messages -->
-      <div id="messages" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column;background:rgba(255,255,255,.04);backdrop-filter:blur(8px)"></div>
+    <!-- Messages — fullscreen -->
+    <div id="messages" style="flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;position:relative;z-index:2"></div>
 
-      <!-- Quick prompts — yaşa göre -->
-      <div id="quick-prompts" style="padding:6px 16px 6px;display:flex;gap:6px;flex-wrap:wrap;background:rgba(255,255,255,.04)">
-        ${child.age<=8 ? `
-          <button class="chip" onclick="setInput('Bana hikaye anlat! 📖')">Hikaye anlat 📖</button>
-          <button class="chip" onclick="setInput('Hayvanlar hakkında bir şey söyle 🐾')">Hayvanlar 🐾</button>
-          <button class="chip" onclick="setInput('Rakamları öğrenelim 🔢')">Sayılar 🔢</button>
-          <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü 🌤️</button>
-        ` : child.age<=12 ? `
-          <button class="chip" onclick="setInput('Ödev yardımı lazım 📐')">Ödev yardımı 📐</button>
-          <button class="chip" onclick="setInput('Neden gökyüzü mavi? 🌤️')">Gökyüzü neden mavi? 🌤️</button>
-          <button class="chip" onclick="setInput('Uzay hakkında anlat 🚀')">Uzay 🚀</button>
-          <button class="chip" onclick="setInput('Kelime öğret 🔤')">Kelime öğret 🔤</button>
-        ` : `
-          <button class="chip" onclick="setInput('Yapay zeka nasıl çalışır?')">Yapay zeka</button>
-          <button class="chip" onclick="setInput('Üniversite için ne yapmalıyım?')">Üniversite</button>
-          <button class="chip" onclick="setInput('Kitap önerisi lazım')">Kitap önerisi</button>
-          <button class="chip" onclick="setInput('Girişimcilik nasıl öğrenilir?')">Girişimcilik</button>
-        `}
-      </div>
+    <!-- Quick prompts -->
+    <div id="quick-prompts" style="padding:6px 14px;display:flex;gap:6px;flex-wrap:wrap;position:relative;z-index:2">
+      ${child.age<=8 ? `
+        <button class="chip" onclick="setInput('Bana hikaye anlat!')">Hikaye anlat 📖</button>
+        <button class="chip" onclick="setInput('Hayvanlar hakkında bir şey söyle')">Hayvanlar 🐾</button>
+        <button class="chip" onclick="setInput('Sayıları öğrenelim')">Sayılar 🔢</button>
+        <button class="chip" onclick="setInput('Neden gökyüzü mavi?')">Gökyüzü 🌤️</button>
+      ` : child.age<=12 ? `
+        <button class="chip" onclick="setInput('Ödev yardımı lazım')">Ödev yardımı 📐</button>
+        <button class="chip" onclick="setInput('Uzay hakkında anlat')">Uzay 🚀</button>
+        <button class="chip" onclick="setInput('Kelime öğret')">Kelime öğret 🔤</button>
+        <button class="chip" onclick="setInput('Neden depremler olur?')">Depremler 🌍</button>
+      ` : `
+        <button class="chip" onclick="setInput('Yapay zeka nasıl çalışır?')">Yapay zeka</button>
+        <button class="chip" onclick="setInput('Üniversite için ne yapmalıyım?')">Üniversite</button>
+        <button class="chip" onclick="setInput('Kitap önerisi lazım')">Kitap önerisi</button>
+        <button class="chip" onclick="setInput('Girişimcilik nasıl öğrenilir?')">Girişimcilik</button>
+      `}
+    </div>
 
-      <!-- Input bar -->
-      <div style="padding:10px 14px 14px;border-top:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);backdrop-filter:blur(12px);flex-shrink:0">
-        <div id="mic-err" style="display:none;background:rgba(244,132,95,.15);border:1px solid rgba(244,132,95,.3);border-radius:10px;padding:7px 12px;font-size:12px;color:#fca88a;font-weight:600;margin-bottom:8px;text-align:center"></div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <button id="mic-btn" onclick="toggleMic()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" fill="white"/><path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="22" x2="15" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-          <input id="chat-input" placeholder="Bibi'ye yaz veya konuş..." onkeydown="if(event.key==='Enter')sendMessage()" style="flex:1;padding:12px 16px;border-radius:24px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.12);font-size:15px;color:white;backdrop-filter:blur(8px)"/>
-          <button id="send-btn" onclick="sendMessage()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.25);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-        </div>
+    <!-- Input bar — fullscreen width -->
+    <div style="padding:10px 14px 18px;background:rgba(0,0,0,.25);backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.08);position:relative;z-index:2;flex-shrink:0">
+      <div id="mic-err" style="display:none;background:rgba(244,132,95,.15);border:1px solid rgba(244,132,95,.3);border-radius:10px;padding:7px 12px;font-size:12px;color:#fca88a;font-weight:600;margin-bottom:8px;text-align:center"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="mic-btn" onclick="toggleMic()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" fill="white"/><path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="22" x2="15" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <input id="chat-input" placeholder="Bibi'ye yaz veya konuş..." onkeydown="if(event.key==='Enter')sendMessage()" style="flex:1;padding:13px 18px;border-radius:28px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);font-size:15px;color:white;font-family:'Nunito',sans-serif;backdrop-filter:blur(8px)"/>
+        <button id="send-btn" onclick="sendMessage()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.22);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
       </div>
     </div>
   </div>`);
 
-  // Start session & first message
   sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{ if(data) sessionId=data.id; });
-  // Yaşa göre kişiselleştirilmiş açılış mesajı
   const openMsg = child.age<=8
-    ? `Heyyyy ${child.name}! 🎉 Bugün benimle ne öğrenmek istersin?`
+    ? `Heyyyy ${child.name}! Bugün benimle ne öğrenmek istersin? 🎉`
     : child.age<=12
-    ? `Merhaba ${child.name}! Bugün ne keşfetmek istersin? 🌍`
+    ? `Merhaba ${child.name}! Bugün ne keşfetmek istersin?`
     : `Selam ${child.name}. Bugün ne konuşacağız?`;
   addMsg("bibi", openMsg);
 }
@@ -1273,7 +1270,7 @@ function startChat(child){
 function setExpr(expr){
   chatExpr=expr;
   const wrap=el("bibi-face-wrap");
-  if(wrap) wrap.innerHTML=bibiFaceSVG(expr,110);
+  if(wrap) wrap.innerHTML=bibiFaceSVG(expr,44);
 }
 
 function setStatus(text,color){
@@ -1288,18 +1285,32 @@ function addMsg(role, text){
   const theme=getTheme(currentChild);
   const row=document.createElement("div");
   row.className=`msg-row ${role}`;
+  row.style.cssText="display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
+  if(role==="user") row.style.justifyContent="flex-end";
+
+  if(role==="bibi"){
+    // Mini Bibi avatar yanında
+    const avatar=document.createElement("div");
+    avatar.style.cssText="flex-shrink:0;width:36px;height:36px;animation:breathe 3.5s ease-in-out infinite";
+    avatar.innerHTML=bibiFaceSVG("idle",36);
+    row.appendChild(avatar);
+  }
+
   const bubble=document.createElement("div");
-  bubble.className=role==="bibi"?"msg-bibi":"msg-user";
-  if(role==="user") bubble.style.background=theme.bubble;
+  bubble.style.cssText=role==="bibi"
+    ? "max-width:72%;padding:12px 15px;border-radius:4px 18px 18px 18px;background:rgba(255,255,255,0.92);color:#1A2E2A;font-size:15px;line-height:1.6;box-shadow:0 2px 12px rgba(0,0,0,.12);backdrop-filter:blur(8px);font-weight:500"
+    : `max-width:72%;padding:12px 15px;border-radius:18px 4px 18px 18px;background:${theme.bubble};color:white;font-size:15px;line-height:1.6;font-weight:600;box-shadow:0 2px 12px rgba(0,0,0,.2)`;
   bubble.textContent=text;
   row.appendChild(bubble);
+
   if(role==="bibi"){
     const btn=document.createElement("button");
-    btn.style.cssText="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7";
-    btn.innerHTML='<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
+    btn.style.cssText="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7;align-self:flex-end";
+    btn.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
     btn.onclick=()=>speak(text);
     row.appendChild(btn);
   }
+
   msgsEl.appendChild(row);
   msgsEl.scrollTop=msgsEl.scrollHeight;
   if(messages.length>2){ const qp=el("quick-prompts"); if(qp) qp.style.display="none"; }
@@ -1308,8 +1319,15 @@ function addMsg(role, text){
 function addTyping(){
   const msgsEl=el("messages"); if(!msgsEl) return;
   const row=document.createElement("div");
-  row.id="typing-row"; row.className="msg-row bibi";
-  row.innerHTML='<div class="msg-bibi" style="display:flex;gap:5px;align-items:center;padding:14px 18px"><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease infinite"></span><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .2s infinite"></span><span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .4s infinite"></span></div>';
+  row.id="typing-row";
+  row.style.cssText="display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
+  row.innerHTML=`
+    <div style="flex-shrink:0;width:36px;height:36px;animation:thinkBob 1.5s ease-in-out infinite">${bibiFaceSVG("thinking",36)}</div>
+    <div style="padding:13px 18px;border-radius:4px 18px 18px 18px;background:rgba(255,255,255,.9);display:flex;gap:5px;align-items:center;box-shadow:0 2px 12px rgba(0,0,0,.1)">
+      <span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease infinite"></span>
+      <span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .2s infinite"></span>
+      <span style="width:8px;height:8px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease .4s infinite"></span>
+    </div>`;
   msgsEl.appendChild(row); msgsEl.scrollTop=msgsEl.scrollHeight;
 }
 
@@ -1337,9 +1355,10 @@ async function sendMessage(){
     const reply=data.choices?.[0]?.message?.content||data.error?.message||"Bir sorun oluştu 🙈";
     removeTyping();
     setExpr("happy"); setStatus("Seninle burada!","#4ade80");
+    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("happy",44);
     addMsg("bibi",reply);
     speak(reply);
-    setTimeout(()=>setExpr("idle"),3000);
+    setTimeout(()=>{ setExpr("idle"); const w=el("bibi-face-wrap"); if(w) w.innerHTML=bibiFaceSVG("idle",44); },3000);
     if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
   }catch(e){
     removeTyping(); setExpr("idle");
@@ -1359,24 +1378,69 @@ async function goBack(){
 // ── VOICE ─────────────────────────────────────────────────────
 function speak(text){
   if(!voiceOn||!window.speechSynthesis) return;
-  // Tüm emoji, özel karakter ve semboller temizlenir
+
+  // Emoji ve semboller tamamen temizlenir
   let clean = text
-    .replace(/[\u{1F000}-\u{1FFFF}]/gu,"")   // emoji blok 1
-    .replace(/[\u{2600}-\u{27BF}]/gu,"")      // semboller (☀️ ✨ vb)
-    .replace(/[\u{1F300}-\u{1F9FF}]/gu,"")   // emoji blok 2
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu,"")
+    .replace(/[\u{2600}-\u{27BF}]/gu,"")
+    .replace(/[\u{1F300}-\u{1F9FF}]/gu,"")
     .replace(/[\u2702-\u27B0]/gu,"")
     .replace(/[★☆♥♦♣♠•◦▪▫►◄▲▼]/g,"")
-    .replace(/━+/g," ")                        // yatay çizgiler
-    .replace(/[🌟👋📐🌤️📖🔤💙🙈😅🎙️🎤🤖🧠🔬📚⚽🎮🔭🌿🍎🎈🎉🌈]/g,"")
+    .replace(/━+/g," ")
     .replace(/\s+/g," ")
     .trim();
+
+  if(!clean) return;
   window.speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(clean);
-  u.lang="tr-TR"; u.rate=0.9; u.pitch=1.2;
-  const vs=window.speechSynthesis.getVoices();
-  const tv=vs.find(v=>v.lang.startsWith("tr")); if(tv) u.voice=tv;
-  u.onstart=()=>{setExpr("talking"); setStatus("Konuşuyor...","#a78bfa");};
-  u.onend=()=>{setExpr("idle"); setStatus("Seninle burada!","#4ade80");};
+
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = "tr-TR";
+
+  // Yaşa göre ses ayarları — doğal ve tatlı
+  const age = currentChild?.age || 9;
+  if(age <= 8){
+    // Küçük çocuklar: yüksek perdeli, neşeli, yavaş
+    u.rate  = 0.82;
+    u.pitch = 1.45;
+    u.volume = 1.0;
+  } else if(age <= 12){
+    // Ortalar: orta perde, akıcı, doğal
+    u.rate  = 0.88;
+    u.pitch = 1.20;
+    u.volume = 1.0;
+  } else {
+    // Büyükler: daha derin, doğal insan sesi gibi
+    u.rate  = 0.92;
+    u.pitch = 1.05;
+    u.volume = 1.0;
+  }
+
+  // Türkçe ses tercih et — varsa kadın sesi seç (daha tatlı)
+  const voices = window.speechSynthesis.getVoices();
+  const trFemale = voices.find(v => v.lang.startsWith("tr") && v.name.toLowerCase().includes("female"))
+    || voices.find(v => v.lang.startsWith("tr") && (v.name.includes("Filiz") || v.name.includes("Yelda")))
+    || voices.find(v => v.lang.startsWith("tr"));
+  if(trFemale) u.voice = trFemale;
+
+  u.onstart = () => {
+    setExpr("talking");
+    setStatus("Konuşuyor...","#a78bfa");
+    // Header'daki mini Bibi'yi de güncelle
+    const wrap = el("bibi-face-wrap");
+    if(wrap) wrap.innerHTML = bibiFaceSVG("talking", 44);
+  };
+  u.onend = () => {
+    setExpr("idle");
+    setStatus(`${currentChild?.name||""} ile`,"#4ade80");
+    const wrap = el("bibi-face-wrap");
+    if(wrap) wrap.innerHTML = bibiFaceSVG("idle", 44);
+  };
+  u.onerror = () => {
+    setExpr("idle");
+    const wrap = el("bibi-face-wrap");
+    if(wrap) wrap.innerHTML = bibiFaceSVG("idle", 44);
+  };
+
   window.speechSynthesis.speak(u);
 }
 
