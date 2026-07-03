@@ -1494,9 +1494,22 @@ function addMsg(role, text){
 
   if(role==="bibi"){
     const btn=document.createElement("button");
-    btn.style.cssText="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7;align-self:flex-end";
+    btn.className="msg-speak-btn";
+    btn.style.cssText="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;opacity:.7;align-self:flex-end;transition:all .2s";
     btn.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
-    btn.onclick=()=>speak(text);
+    btn.onclick=()=>{
+      if(speechActive && !speechPaused && speechCurrentText===cleanText(text)){
+        // Bu mesaj okunuyor — durdur
+        toggleVoice();
+        btn.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
+      } else if(speechPaused && speechCurrentText===cleanText(text)){
+        // Bu mesaj duraklatıldı — devam et
+        toggleVoice();
+      } else {
+        // Yeni mesajı baştan oku
+        speak(text);
+      }
+    };
     row.appendChild(btn);
   }
 
@@ -1908,6 +1921,20 @@ function updateVoiceBtn(){
       :`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>`;
     btn.title=voiceOn?"Sesi kapat":"Sesi aç";
   }
+
+  // Mesaj butonlarını da güncelle
+  document.querySelectorAll(".msg-speak-btn").forEach(b=>{
+    if(speechActive && !speechPaused){
+      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="6" height="12" rx="1" fill="white"/><rect x="12" y="3" width="6" height="12" rx="1" fill="white"/></svg>';
+      b.title="Durdur";
+    } else if(speechPaused){
+      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,2 18,9 5,16" fill="white"/></svg>';
+      b.title="Devam et";
+    } else {
+      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
+      b.title="Dinle";
+    }
+  });
 }
 
 function toggleMic(){
