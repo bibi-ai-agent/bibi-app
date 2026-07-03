@@ -433,7 +433,8 @@ async function acceptInvite(myChildId){
   showFriendMsg(`${friend.name} arkadaş olarak eklendi! 🎉`,"ok");
   document.getElementById("friend-code-inp").value="";
   const myChild = currentChild || {id:myChildId};
-  setTimeout(()=>loadFriends(myChild),800);
+  // Hemen yenile — gecikme yok
+  await loadFriends(myChild);
 }
 
 function showFriendMsg(msg, type){
