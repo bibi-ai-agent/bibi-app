@@ -432,9 +432,9 @@ async function acceptInvite(myChildId){
 
   showFriendMsg(`${friend.name} arkadaş olarak eklendi! 🎉`,"ok");
   document.getElementById("friend-code-inp").value="";
-  const myChild = currentChild || {id:myChildId};
-  // Hemen yenile — gecikme yok
-  await loadFriends(myChild);
+  // Tüm ekranı yeniden render et
+  const {data:updatedChild} = await sb.from("children").select("*").eq("id",myChildId).single();
+  if(updatedChild) screenFriends(updatedChild);
 }
 
 function showFriendMsg(msg, type){
