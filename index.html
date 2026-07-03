@@ -1424,9 +1424,13 @@ async function screenChildren(){
             <div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div>
             <div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaş · ${c.grade||""} · ${c.gender==="kız"?"Kız":"Erkek"}</div>
           </div>
-          <button onclick="event.stopPropagation();screenPinLock(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:32px;height:32px;border-radius:50%;background:#e8f7f3;border:1px solid #c5e8e0;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center" title="Gelişim Raporu">📊</button>
-          <button onclick="event.stopPropagation();screenFriends(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:32px;height:32px;border-radius:50%;background:#f0e8ff;border:1px solid #d8b4fe;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center" title="Arkadaşlar">🤝</button>
-          <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:32px;height:32px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">🗑️</button>
+          <div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0">
+            <div style="display:flex;gap:5px">
+              <button onclick="event.stopPropagation();screenPinLock(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:30px;height:30px;border-radius:50%;background:#e8f7f3;border:1px solid #c5e8e0;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center" title="Gelişim Raporu">📊</button>
+              <button onclick="event.stopPropagation();screenFriends(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:30px;height:30px;border-radius:50%;background:#f0e8ff;border:1px solid #d8b4fe;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center" title="Arkadaşlar & Projeler">🤝</button>
+              <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:30px;height:30px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center">🗑️</button>
+            </div>
+          </div>
           <div style="font-size:22px;color:#d1d5db">›</div>
         </div>`).join("")}
       </div>
