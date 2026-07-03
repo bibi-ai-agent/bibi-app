@@ -1772,11 +1772,14 @@ async function goBack(){
 }
 
 // ── VOICE ─────────────────────────────────────────────────────
-function speak(text){
-  if(!voiceOn||!window.speechSynthesis) return;
+// ── Ses sistemi — durdur/devam et desteği ────────────────────
+let speechSentences = [];   // Cümle listesi
+let speechIndex = 0;        // Şu an okunan cümle
+let speechPaused = false;   // Duraklatıldı mı?
+let speechActive = false;   // Aktif okuma var mı?
 
-  // Emoji ve semboller tamamen temizlenir
-  let clean = text
+function cleanText(text){
+  return text
     .replace(/[\u{1F000}-\u{1FFFF}]/gu,"")
     .replace(/[\u{2600}-\u{27BF}]/gu,"")
     .replace(/[\u{1F300}-\u{1F9FF}]/gu,"")
@@ -1785,66 +1788,131 @@ function speak(text){
     .replace(/━+/g," ")
     .replace(/\s+/g," ")
     .trim();
+}
 
-  if(!clean) return;
-  window.speechSynthesis.cancel();
-
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = "tr-TR";
-
-  // Yaşa göre ses ayarları — doğal ve tatlı
+function getVoiceSettings(){
   const age = currentChild?.age || 9;
-  if(age <= 8){
-    // Küçük çocuklar: yüksek perdeli, neşeli, yavaş
-    u.rate  = 0.82;
-    u.pitch = 1.45;
-    u.volume = 1.0;
-  } else if(age <= 12){
-    // Ortalar: orta perde, akıcı, doğal
-    u.rate  = 0.88;
-    u.pitch = 1.20;
-    u.volume = 1.0;
-  } else {
-    // Büyükler: daha derin, doğal insan sesi gibi
-    u.rate  = 0.92;
-    u.pitch = 1.05;
-    u.volume = 1.0;
+  if(age <= 8)  return {rate:0.82, pitch:1.45, volume:1.0};
+  if(age <= 12) return {rate:0.88, pitch:1.20, volume:1.0};
+  return                {rate:0.92, pitch:1.05, volume:1.0};
+}
+
+function getTRVoice(){
+  const voices = window.speechSynthesis.getVoices();
+  return voices.find(v=>v.lang.startsWith("tr")&&v.name.toLowerCase().includes("female"))
+    || voices.find(v=>v.lang.startsWith("tr")&&(v.name.includes("Filiz")||v.name.includes("Yelda")))
+    || voices.find(v=>v.lang.startsWith("tr"))
+    || null;
+}
+
+function speakSentence(index){
+  if(index >= speechSentences.length || speechPaused){
+    if(index >= speechSentences.length){
+      // Bitti
+      speechActive = false;
+      speechIndex = 0;
+      setExpr("idle");
+      setStatus(`${currentChild?.name||""} ile`,"#4ade80");
+      const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+      updateVoiceBtn();
+    }
+    return;
   }
 
-  // Türkçe ses tercih et — varsa kadın sesi seç (daha tatlı)
-  const voices = window.speechSynthesis.getVoices();
-  const trFemale = voices.find(v => v.lang.startsWith("tr") && v.name.toLowerCase().includes("female"))
-    || voices.find(v => v.lang.startsWith("tr") && (v.name.includes("Filiz") || v.name.includes("Yelda")))
-    || voices.find(v => v.lang.startsWith("tr"));
-  if(trFemale) u.voice = trFemale;
+  const sentence = speechSentences[index];
+  if(!sentence.trim()){ speakSentence(index+1); return; }
+
+  const u = new SpeechSynthesisUtterance(sentence);
+  u.lang = "tr-TR";
+  const vs = getVoiceSettings();
+  u.rate = vs.rate; u.pitch = vs.pitch; u.volume = vs.volume;
+  const tv = getTRVoice(); if(tv) u.voice = tv;
 
   u.onstart = () => {
+    speechIndex = index;
+    speechActive = true;
     setExpr("talking");
     setStatus("Konuşuyor...","#a78bfa");
-    // Header'daki mini Bibi'yi de güncelle
-    const wrap = el("bibi-face-wrap");
-    if(wrap) wrap.innerHTML = bibiFaceSVG("talking", 44);
+    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44);
+    updateVoiceBtn();
   };
   u.onend = () => {
-    setExpr("idle");
-    setStatus(`${currentChild?.name||""} ile`,"#4ade80");
-    const wrap = el("bibi-face-wrap");
-    if(wrap) wrap.innerHTML = bibiFaceSVG("idle", 44);
+    if(!speechPaused) speakSentence(index+1);
   };
   u.onerror = () => {
-    setExpr("idle");
-    const wrap = el("bibi-face-wrap");
-    if(wrap) wrap.innerHTML = bibiFaceSVG("idle", 44);
+    if(!speechPaused) speakSentence(index+1);
   };
 
   window.speechSynthesis.speak(u);
 }
 
+function speak(text){
+  if(!window.speechSynthesis) return;
+
+  // Yeni metin başlıyor — sıfırla
+  window.speechSynthesis.cancel();
+  speechPaused = false;
+  speechActive = false;
+
+  const clean = cleanText(text);
+  if(!clean) return;
+
+  // Metni cümlelere böl (. ! ? sonrası)
+  speechSentences = clean.match(/[^.!?]+[.!?]?/g)?.filter(s=>s.trim()) || [clean];
+  speechIndex = 0;
+
+  speakSentence(0);
+}
+
+function toggleSpeech(){
+  if(!window.speechSynthesis) return;
+
+  if(speechActive && !speechPaused){
+    // Durdur
+    window.speechSynthesis.cancel();
+    speechPaused = true;
+    speechActive = false;
+    setExpr("idle");
+    setStatus("Duraklatıldı ⏸","#fbbf24");
+    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+    updateVoiceBtn();
+  } else if(speechPaused){
+    // Kaldığı yerden devam et
+    speechPaused = false;
+    speakSentence(speechIndex);
+  } else {
+    // Ses kapalıysa aç
+    voiceOn = !voiceOn;
+    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+    updateVoiceBtn();
+  }
+}
+
+function updateVoiceBtn(){
+  const btn = el("voice-btn");
+  if(!btn) return;
+  if(speechActive && !speechPaused){
+    // Konuşuyor — durdur ikonu göster
+    btn.style.background = "rgba(167,139,250,.3)";
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white"/></svg>`;
+    btn.title = "Durdur";
+  } else if(speechPaused){
+    // Duraklatıldı — devam et ikonu göster
+    btn.style.background = "rgba(251,191,36,.3)";
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>`;
+    btn.title = "Devam et";
+  } else {
+    // Normal ses butonu
+    btn.style.background = voiceOn ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.3)";
+    btn.innerHTML = voiceOn
+      ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
+      : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>`;
+    btn.title = voiceOn ? "Sesi kapat" : "Sesi aç";
+  }
+}
+
 function toggleVoice(){
-  voiceOn=!voiceOn;
-  const btn=el("voice-btn");
-  if(btn) btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
-  if(!voiceOn) window.speechSynthesis?.cancel();
+  toggleSpeech();
 }
 
 function toggleMic(){
