@@ -403,36 +403,37 @@ async function acceptInvite(myChildId){
   const code = document.getElementById("friend-code-inp")?.value.trim().toUpperCase();
   if(!code||code.length!==6){ showFriendMsg("6 haneli kod girin","err"); return; }
 
-  // Güvenli view üzerinden ara
-  const {data:friend, error:findErr} = await sb
+  // View'den ara
+  const {data:friendArr} = await sb
     .from("children_invite_lookup")
     .select("id,name,age,gender,bibi_specialty")
-    .eq("invite_code",code)
-    .single();
+    .eq("invite_code",code);
 
-  if(findErr||!friend){ showFriendMsg("Bu kod bulunamadı, kontrol edin","err"); return; }
+  const friend = friendArr?.[0];
+  if(!friend){ showFriendMsg("Bu kod bulunamadı, kontrol edin","err"); return; }
   if(friend.id===myChildId){ showFriendMsg("Kendinize davet kodu kullanamazsınız","err"); return; }
 
   // Arkadaşlık zaten var mı?
-  const {data:existing} = await sb.from("friendships")
-    .select("id,status")
-    .or(`and(child_id_1.eq.${myChildId},child_id_2.eq.${friend.id}),and(child_id_1.eq.${friend.id},child_id_2.eq.${myChildId})`)
-    .single();
-  if(existing){ showFriendMsg(`${friend.name} zaten arkadaşınız!`,"ok"); return; }
+  const {data:ex1} = await sb.from("friendships").select("id").eq("child_id_1",myChildId).eq("child_id_2",friend.id);
+  const {data:ex2} = await sb.from("friendships").select("id").eq("child_id_1",friend.id).eq("child_id_2",myChildId);
+  if((ex1&&ex1.length>0)||(ex2&&ex2.length>0)){
+    showFriendMsg(`${friend.name} zaten arkadaşınız!`,"ok");
+    return;
+  }
 
   // Arkadaşlık oluştur
   const {error} = await sb.from("friendships").insert({
-    child_id_1: myChildId, child_id_2: friend.id,
-    status:"active", invited_by:myChildId, invite_code:code
+    child_id_1: myChildId,
+    child_id_2: friend.id,
+    status: "active",
+    invited_by: myChildId
   });
-  if(error){ showFriendMsg("Bir hata oluştu: "+error.message,"err"); return; }
-
-  // Kodu temizle (RPC ile — direkt update yetkisi olmayabilir)
-  await sb.rpc("clear_invite_code", {child_id_param: friend.id}).catch(()=>{});
+  if(error){ showFriendMsg("Hata: "+error.message,"err"); return; }
 
   showFriendMsg(`${friend.name} arkadaş olarak eklendi! 🎉`,"ok");
   document.getElementById("friend-code-inp").value="";
-  // Tüm ekranı yeniden render et
+
+  // Ekranı yenile
   const {data:updatedChild} = await sb.from("children").select("*").eq("id",myChildId).single();
   if(updatedChild) screenFriends(updatedChild);
 }
