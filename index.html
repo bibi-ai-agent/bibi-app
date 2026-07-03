@@ -401,12 +401,16 @@ async function genInvite(childId){
 
 async function acceptInvite(myChildId){
   const code = document.getElementById("friend-code-inp")?.value.trim().toUpperCase();
-  const msgEl = document.getElementById("friend-msg");
   if(!code||code.length!==6){ showFriendMsg("6 haneli kod girin","err"); return; }
 
-  // Kodu olan çocuğu bul
-  const {data:friend} = await sb.from("children").select("id,name,age,gender,bibi_specialty").eq("invite_code",code).single();
-  if(!friend){ showFriendMsg("Bu kod bulunamadı, kontrol edin","err"); return; }
+  // Güvenli view üzerinden ara
+  const {data:friend, error:findErr} = await sb
+    .from("children_invite_lookup")
+    .select("id,name,age,gender,bibi_specialty")
+    .eq("invite_code",code)
+    .single();
+
+  if(findErr||!friend){ showFriendMsg("Bu kod bulunamadı, kontrol edin","err"); return; }
   if(friend.id===myChildId){ showFriendMsg("Kendinize davet kodu kullanamazsınız","err"); return; }
 
   // Arkadaşlık zaten var mı?
@@ -423,12 +427,11 @@ async function acceptInvite(myChildId){
   });
   if(error){ showFriendMsg("Bir hata oluştu: "+error.message,"err"); return; }
 
-  // Kodu temizle
-  await sb.from("children").update({invite_code:null}).eq("id",friend.id);
+  // Kodu temizle (RPC ile — direkt update yetkisi olmayabilir)
+  await sb.rpc("clear_invite_code", {child_id_param: friend.id}).catch(()=>{});
+
   showFriendMsg(`${friend.name} arkadaş olarak eklendi! 🎉`,"ok");
   document.getElementById("friend-code-inp").value="";
-
-  // Listeyi yenile
   const myChild = currentChild || {id:myChildId};
   setTimeout(()=>loadFriends(myChild),800);
 }
