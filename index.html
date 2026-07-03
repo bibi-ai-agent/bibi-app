@@ -1318,7 +1318,7 @@ async function signOut(){ await sb.auth.signOut(); currentUser=null; currentChil
 // ══════════════════════════════════════════════════════════════
 let chatExpr = "idle", mouthInterval = null;
 
-function startChat(child){
+async function startChat(child){
   if(typeof child==="string") child=JSON.parse(child);
   currentChild=child; messages=[]; sessionStart=new Date();
   const theme=getTheme(child);
@@ -1409,6 +1409,40 @@ function startChat(child){
     </div>
   </div>`);
 
+  // Son oturumu kontrol et — bitmemişse kaldığı yerden devam et
+  const today = new Date(); today.setHours(0,0,0,0);
+  const {data:lastSession} = await sb.from("sessions")
+    .select("id,ended_at,started_at")
+    .eq("child_id", child.id)
+    .order("started_at",{ascending:false})
+    .limit(1)
+    .single();
+
+  if(lastSession && !lastSession.ended_at){
+    // Bitmemiş oturum var — devam et
+    sessionId = lastSession.id;
+    console.log("Kaldığı yerden devam:", sessionId);
+
+    const {data:oldMsgs} = await sb.from("messages")
+      .select("role,content")
+      .eq("session_id", sessionId)
+      .order("created_at",{ascending:true});
+
+    if(oldMsgs && oldMsgs.length > 0){
+      const qp = el("quick-prompts"); if(qp) qp.style.display="none";
+      oldMsgs.forEach(m => addMsg(m.role==="user"?"user":"bibi", m.content));
+      // "Devam ediyoruz" mesajı
+      const resumeMsg = child.age<=8
+        ? `Tekrar hoşgeldin ${child.name}! 🎉 Kaldığımız yerden devam edelim mi?`
+        : child.age<=12
+        ? `Tekrar merhaba ${child.name}! Sohbetimize kaldığımız yerden devam edelim.`
+        : `Hoş geldin ${child.name}. Kaldığımız yerden devam ediyoruz.`;
+      addMsg("bibi", resumeMsg);
+      return;
+    }
+  }
+
+  // Yeni oturum başlat
   sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data,error})=>{
     if(error) console.error("Session hatası:", JSON.stringify(error));
     if(data){ sessionId=data.id; console.log("Session ID:", sessionId); }
