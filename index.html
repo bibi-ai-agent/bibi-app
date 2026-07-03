@@ -314,117 +314,414 @@ async function updateMastery(childId, topic){
     } else {
       await sb.from("mastery").insert({child_id:childId, topic, score:8, message_count:1});
     }
+    // Uzmanlık alanını güncelle — en yüksek skorlu konu
+    const {data:all} = await sb.from("mastery").select("topic,score").eq("child_id",childId).order("score",{ascending:false}).limit(1);
+    if(all && all[0]){
+      await sb.from("children").update({bibi_specialty:all[0].topic}).eq("id",childId);
+      if(currentChild && currentChild.id===childId) currentChild.bibi_specialty=all[0].topic;
+    }
   }catch(e){
-    // mastery tablosu yoksa veya satır bulunamazsa sessizce devam et
     await sb.from("mastery").insert({child_id:childId, topic, score:8, message_count:1}).then(()=>{}).catch(()=>{});
   }
 }
 
-function buildPrompt(child){
+// ── Davet Kodu Oluştur ─────────────────────────────────────────
+function generateCode(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
+
+async function createInviteCode(childId){
+  const code = generateCode();
+  await sb.from("children").update({invite_code:code}).eq("id",childId);
+  return code;
+}
+
+// ── Arkadaş Ekle Ekranı ───────────────────────────────────────
+function screenFriends(child){
+  if(typeof child==="string") child=JSON.parse(child);
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);padding:0 0 40px;position:relative;overflow:hidden">
+    ${floatingBibis(4,["#0D9B7E"])}
+    <div style="background:rgba(255,255,255,.06);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;backdrop-filter:blur(12px)">
+      <div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Arkadaşlar</div>
+        <div style="color:white;font-size:18px;font-weight:900;margin-top:2px">${child.name}'in Bibi'si</div>
+      </div>
+      <button onclick="screenChildren()" style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);border-radius:20px;padding:8px 16px;color:white;font-size:13px;font-weight:700;cursor:pointer">← Geri</button>
+    </div>
+
+    <div style="max-width:480px;margin:0 auto;padding:20px 16px">
+
+      <!-- Uzmanlık rozeti -->
+      ${child.bibi_specialty ? `
+      <div style="background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.12);border-radius:16px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
+        <div style="font-size:28px">${{Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"}[child.bibi_specialty]||"⭐"}</div>
+        <div>
+          <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px">Bibi'nin Uzmanlığı</div>
+          <div style="color:white;font-size:16px;font-weight:800;margin-top:2px">${child.bibi_specialty} Uzmanı</div>
+        </div>
+      </div>` : ""}
+
+      <!-- Davet kodu oluştur -->
+      <div style="background:rgba(13,155,126,.15);border:1.5px solid rgba(13,155,126,.3);border-radius:16px;padding:18px;margin-bottom:16px">
+        <div style="color:#4ade80;font-size:13px;font-weight:800;margin-bottom:8px">📤 Arkadaşını Davet Et</div>
+        <div style="color:rgba(255,255,255,.6);font-size:12px;margin-bottom:12px">Arkadaşına vereceğin bir davet kodu oluştur. Velisi bu kodu girince bağlanırsınız.</div>
+        <div id="invite-display" style="display:none;background:rgba(0,0,0,.3);border-radius:10px;padding:12px;text-align:center;margin-bottom:12px">
+          <div style="color:rgba(255,255,255,.5);font-size:11px;margin-bottom:4px">Davet Kodun</div>
+          <div id="invite-code-text" style="color:#4ade80;font-size:28px;font-weight:900;letter-spacing:8px"></div>
+          <div style="color:rgba(255,255,255,.4);font-size:11px;margin-top:4px">Arkadaşının velisine bu kodu ver</div>
+        </div>
+        <button onclick="genInvite('${child.id}')" id="gen-invite-btn" style="width:100%;padding:11px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:14px;cursor:pointer">🎲 Davet Kodu Oluştur</button>
+      </div>
+
+      <!-- Davet kodu gir -->
+      <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:18px;margin-bottom:20px">
+        <div style="color:white;font-size:13px;font-weight:800;margin-bottom:8px">📥 Arkadaş Kodu Gir</div>
+        <div style="display:flex;gap:8px">
+          <input id="friend-code-inp" placeholder="6 haneli kod (örn: AB1234)" maxlength="6" style="flex:1;padding:11px 14px;border-radius:10px;border:1.5px solid rgba(255,255,255,.15);background:rgba(255,255,255,.08);color:white;font-size:16px;font-weight:800;letter-spacing:4px;text-transform:uppercase;font-family:'Nunito',sans-serif" oninput="this.value=this.value.toUpperCase()"/>
+          <button onclick="acceptInvite('${child.id}')" style="padding:11px 16px;border-radius:10px;border:none;background:#7C3AED;color:white;font-weight:800;font-size:14px;cursor:pointer">Ekle</button>
+        </div>
+        <div id="friend-msg" style="display:none;padding:8px 12px;border-radius:8px;font-size:12px;margin-top:8px"></div>
+      </div>
+
+      <!-- Arkadaş listesi -->
+      <div style="color:rgba(255,255,255,.5);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px">Arkadaşlar</div>
+      <div id="friends-list"><div style="color:rgba(255,255,255,.3);font-size:13px;text-align:center;padding:20px">Yükleniyor...</div></div>
+    </div>
+  </div>`);
+
+  loadFriends(child);
+}
+
+async function genInvite(childId){
+  const code = await createInviteCode(childId);
+  document.getElementById("invite-code-text").textContent = code;
+  document.getElementById("invite-display").style.display = "block";
+  document.getElementById("gen-invite-btn").textContent = "🔄 Yeni Kod Oluştur";
+}
+
+async function acceptInvite(myChildId){
+  const code = document.getElementById("friend-code-inp")?.value.trim().toUpperCase();
+  const msgEl = document.getElementById("friend-msg");
+  if(!code||code.length!==6){ showFriendMsg("6 haneli kod girin","err"); return; }
+
+  // Kodu olan çocuğu bul
+  const {data:friend} = await sb.from("children").select("id,name,age,gender,bibi_specialty").eq("invite_code",code).single();
+  if(!friend){ showFriendMsg("Bu kod bulunamadı, kontrol edin","err"); return; }
+  if(friend.id===myChildId){ showFriendMsg("Kendinize davet kodu kullanamazsınız","err"); return; }
+
+  // Arkadaşlık zaten var mı?
+  const {data:existing} = await sb.from("friendships")
+    .select("id,status")
+    .or(`and(child_id_1.eq.${myChildId},child_id_2.eq.${friend.id}),and(child_id_1.eq.${friend.id},child_id_2.eq.${myChildId})`)
+    .single();
+  if(existing){ showFriendMsg(`${friend.name} zaten arkadaşınız!`,"ok"); return; }
+
+  // Arkadaşlık oluştur
+  const {error} = await sb.from("friendships").insert({
+    child_id_1: myChildId, child_id_2: friend.id,
+    status:"active", invited_by:myChildId, invite_code:code
+  });
+  if(error){ showFriendMsg("Bir hata oluştu: "+error.message,"err"); return; }
+
+  // Kodu temizle
+  await sb.from("children").update({invite_code:null}).eq("id",friend.id);
+  showFriendMsg(`${friend.name} arkadaş olarak eklendi! 🎉`,"ok");
+  document.getElementById("friend-code-inp").value="";
+
+  // Listeyi yenile
+  const myChild = currentChild || {id:myChildId};
+  setTimeout(()=>loadFriends(myChild),800);
+}
+
+function showFriendMsg(msg, type){
+  const el2 = document.getElementById("friend-msg");
+  if(!el2) return;
+  el2.style.display="block";
+  el2.style.background = type==="ok"?"rgba(13,155,126,.2)":"rgba(244,132,95,.2)";
+  el2.style.color = type==="ok"?"#4ade80":"#fca88a";
+  el2.textContent = msg;
+}
+
+async function loadFriends(child){
+  const listEl = document.getElementById("friends-list");
+  if(!listEl) return;
+  const {data:friendships=[]} = await sb.from("friendships")
+    .select("*")
+    .or(`child_id_1.eq.${child.id},child_id_2.eq.${child.id}`)
+    .eq("status","active");
+
+  if(!friendships||friendships.length===0){
+    listEl.innerHTML=`<div style="color:rgba(255,255,255,.3);font-size:13px;text-align:center;padding:30px 0">Henüz arkadaş yok.<br/>Yukarıdan davet kodu oluştur veya gir!</div>`;
+    return;
+  }
+
+  const friendIds = friendships.map(f=>f.child_id_1===child.id?f.child_id_2:f.child_id_1);
+  const {data:friends=[]} = await sb.from("children").select("id,name,age,gender,bibi_specialty").in("id",friendIds);
+  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"};
+
+  listEl.innerHTML = friends.map((f,i)=>{
+    const friendship = friendships.find(fs=>fs.child_id_1===f.id||fs.child_id_2===f.id);
+    const avatarColors=["#7C3AED","#F59E0B","#2563EB","#EC4899","#0D9B7E"];
+    return `
+    <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s ease">
+      <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${f.gender==="kız"?"👧":"👦"}</div>
+      <div style="flex:1">
+        <div style="color:white;font-size:15px;font-weight:800">${f.name}</div>
+        <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${f.age} yaş ${f.bibi_specialty?`· ${specialtyIcons[f.bibi_specialty]||"⭐"} ${f.bibi_specialty} Uzmanı`:""}</div>
+      </div>
+      <button onclick="startProject('${JSON.stringify(child).replace(/"/g,"'")}','${JSON.stringify(f).replace(/"/g,"'")}','${friendship?.id||""}')" style="padding:8px 14px;border-radius:12px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:12px;font-weight:800;cursor:pointer">🚀 Proje Yap</button>
+    </div>`;
+  }).join("");
+}
+
+// ── Proje İş Birliği ──────────────────────────────────────────
+function startProject(myChildStr, friendStr, friendshipId){
+  const myChild = JSON.parse(myChildStr.replace(/'/g,'"'));
+  const friend = JSON.parse(friendStr.replace(/'/g,'"'));
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px">
+    ${floatingBibis(4,["#0D9B7E","#7C3AED"])}
+    <div style="width:100%;max-width:420px;position:relative;z-index:2;animation:fadeUp .4s ease">
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="font-size:36px;margin-bottom:8px">🤝</div>
+        <div style="color:white;font-size:20px;font-weight:900">${myChild.name} & ${friend.name}</div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px">Birlikte proje yapacaksınız!</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','story','${friendshipId}')"
+          style="background:rgba(124,58,237,.2);border:1.5px solid rgba(124,58,237,.4);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+          <div style="font-size:22px">📖</div>
+          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Hikaye Yaz</div>
+          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte yaratıcı bir hikaye yazar</div>
+        </button>
+        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','experiment','${friendshipId}')"
+          style="background:rgba(13,155,126,.15);border:1.5px solid rgba(13,155,126,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+          <div style="font-size:22px">🔬</div>
+          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Deney Tasarla</div>
+          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte bir fen deneyi tasarlar</div>
+        </button>
+        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','quiz','${friendshipId}')"
+          style="background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+          <div style="font-size:22px">🎯</div>
+          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Bilgi Yarışması</div>
+          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte birbirine soru sorar</div>
+        </button>
+      </div>
+      <button onclick="screenFriends(${JSON.stringify(myChild).replace(/"/g,"'")})" style="width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">← Geri</button>
+    </div>
+  </div>`);
+}
+
+async function runProject(myChildStr, friendStr, projectType, friendshipId){
+  const myChild = JSON.parse(myChildStr.replace(/'/g,'"'));
+  const friend = JSON.parse(friendStr.replace(/'/g,'"'));
+  const typeNames = {story:"Hikaye",experiment:"Deney",quiz:"Bilgi Yarışması"};
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;flex-direction:column">
+    <div style="background:rgba(255,255,255,.06);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px)">
+      <div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px">İş Birliği Projesi</div>
+        <div style="color:white;font-size:16px;font-weight:900">${typeNames[projectType]||"Proje"} — ${myChild.name} & ${friend.name}</div>
+      </div>
+      <button onclick="screenChildren()" style="background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:20px;padding:7px 14px;color:white;font-size:12px;font-weight:700;cursor:pointer">✕ Çık</button>
+    </div>
+    <div id="project-msgs" style="flex:1;overflow-y:auto;padding:16px 16px 8px;display:flex;flex-direction:column"></div>
+    <div style="padding:12px 16px 18px;background:rgba(0,0,0,.3);backdrop-filter:blur(12px)">
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="project-inp" placeholder="Bibi'lere bir şey söyle veya sor..." onkeydown="if(event.key==='Enter')sendProjectMsg()" style="flex:1;padding:12px 16px;border-radius:24px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);font-size:15px;color:white;font-family:'Nunito',sans-serif"/>
+        <button onclick="sendProjectMsg()" style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>`);
+
+  // Global proje state
+  window._projectState = {myChild, friend, projectType, friendshipId, messages:[]};
+
+  // Başlangıç mesajı — iki Bibi birlikte karşılıyor
+  addProjectMsg("system", `🤝 ${myChild.name}'in Bibi'si ve ${friend.name}'in Bibi'si birlikte çalışıyor!`);
+  await sendProjectAI(`${typeNames[projectType]} projesini başlatın. ${myChild.name} ve ${friend.name} ile kısa ve heyecanlı bir karşılama yapın, projeyi nasıl yapacağınızı açıklayın ve ilk adımı sorun.`);
+}
+
+function addProjectMsg(role, text){
+  const el2 = document.getElementById("project-msgs"); if(!el2) return;
+  const row = document.createElement("div");
+  row.style.cssText = `display:flex;margin-bottom:12px;animation:fadeUp .3s ease;${role==="user"?"justify-content:flex-end":"justify-content:flex-start"}`;
+  const bubble = document.createElement("div");
+  bubble.style.cssText = role==="user"
+    ? "max-width:75%;padding:11px 15px;border-radius:18px 4px 18px 18px;background:linear-gradient(135deg,#7C3AED,#0D9B7E);color:white;font-size:14px;line-height:1.6;font-weight:600"
+    : role==="system"
+    ? "max-width:90%;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);font-size:12px;font-weight:600;text-align:center;margin:0 auto"
+    : "max-width:80%;padding:11px 15px;border-radius:4px 18px 18px 18px;background:rgba(255,255,255,.9);color:#1A2E2A;font-size:14px;line-height:1.6;font-weight:500";
+  bubble.textContent = text;
+  row.appendChild(bubble);
+  el2.appendChild(row);
+  el2.scrollTop = el2.scrollHeight;
+}
+
+function addProjectTyping(){
+  const el2=document.getElementById("project-msgs"); if(!el2) return;
+  const row=document.createElement("div"); row.id="proj-typing"; row.style.cssText="display:flex;margin-bottom:12px;animation:fadeUp .3s ease";
+  row.innerHTML='<div style="padding:12px 16px;border-radius:4px 18px 18px 18px;background:rgba(255,255,255,.15);display:flex;gap:5px;align-items:center"><span style="width:7px;height:7px;border-radius:50%;background:#4ade80;animation:dotPulse 1.2s ease infinite"></span><span style="width:7px;height:7px;border-radius:50%;background:#a78bfa;animation:dotPulse 1.2s ease .2s infinite"></span><span style="width:7px;height:7px;border-radius:50%;background:#4ade80;animation:dotPulse 1.2s ease .4s infinite"></span></div>';
+  el2.appendChild(row); el2.scrollTop=el2.scrollHeight;
+}
+
+async function sendProjectAI(userText){
+  const state = window._projectState;
+  addProjectTyping();
+  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨"};
+  const s1 = state.myChild.bibi_specialty, s2 = state.friend.bibi_specialty;
+
+  const systemPrompt = `Sen iki farklı çocuğun Bibi'si olarak konuşuyorsun:
+- ${state.myChild.name}'in Bibi'si${s1?` (${s1} ${specialtyIcons[s1]||"⭐"} uzmanı)`:""}
+- ${state.friend.name}'in Bibi'si${s2?` (${s2} ${specialtyIcons[s2]||"⭐"} uzmanı)`:""}
+
+Proje türü: ${state.projectType}
+İki çocuk birlikte bir ${state.projectType==="story"?"hikaye":state.projectType==="experiment"?"fen deneyi":"bilgi yarışması"} yapıyor.
+
+KURALLAR:
+• İki Bibi'nin sesini de yansıt — farklı uzmanlıkları olan iki arkadaş gibi
+• Her ikisine de hitap et, ikisinden de katkı iste
+• Kısa, heyecanlı ve işbirlikçi yanıtlar ver
+• Projeyi adım adım ilerlet, her adımda onlardan bir şey sor
+• Türkçe konuş`;
+
+  const apiMessages = [
+    ...state.messages,
+    {role:"user", content:userText}
+  ];
+
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
+      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"system",content:systemPrompt},...apiMessages],max_tokens:800})
+    });
+    const data = await res.json();
+    const reply = data.choices?.[0]?.message?.content || "Bir sorun oluştu 🙈";
+    const t=document.getElementById("proj-typing"); if(t) t.remove();
+    addProjectMsg("bibi", reply);
+    state.messages.push({role:"user",content:userText},{role:"assistant",content:reply});
+
+    // Projeyi kaydet
+    if(state.friendshipId){
+      await sb.from("projects").upsert({friendship_id:state.friendshipId,type:state.projectType,content:JSON.stringify(state.messages),title:`${state.myChild.name} & ${state.friend.name} - ${new Date().toLocaleDateString("tr-TR")}`});
+    }
+  }catch(e){
+    const t=document.getElementById("proj-typing"); if(t) t.remove();
+    addProjectMsg("bibi","Bağlantıda sorun var 😅");
+  }
+}
+
+function sendProjectMsg(){
+  const inp = document.getElementById("project-inp");
+  const text = inp?.value.trim(); if(!text) return;
+  inp.value="";
+  addProjectMsg("user",text);
+  sendProjectAI(text);
+}
+
+
+
+function buildPrompt(child, friendChild=null, projectType=null){
   const age = child.age || 9;
   const name = child.name || "sevgili";
   const gender = child.gender === "kız" ? "kız" : "erkek";
   const grade = child.grade || "?";
+  const specialty = child.bibi_specialty;
+
+  const specialtyProfiles = {
+    "Matematik": "Matematik konularında derinsin. Sayılar, geometri, mantık senin oyun alanın. Matematik öğretirken oyunlaştırırsın.",
+    "Fen": "Bilim ve keşif senin tutkun. Deneyler, doğa, evren hakkında coşkuyla anlatırsın.",
+    "Dil": "Kelimeler ve hikayeler senin dünyan. Yaratıcı yazarlık, şiir, dil oyunları uzmanlığın.",
+    "Tarih": "Geçmiş senin için canlı. Tarihi kişileri ve olayları hikaye gibi anlatırsın.",
+    "Sanat": "Yaratıcılık ve estetik senin özün. Çizim, müzik, tasarım konularında ilham verirsin.",
+    "Genel": "Merakın sınırı yok. Her konuya eşit ilgiyle yaklaşırsın.",
+  };
+  const specialtyText = specialty && specialtyProfiles[specialty]
+    ? `\nUZMANLIK ALANING: ${specialty}\n${specialtyProfiles[specialty]}\n`
+    : "";
+
+  // İş birliği modu
+  let colabSection = "";
+  if(friendChild && projectType){
+    const projTypes = {story:"birlikte yaratıcı bir hikaye", experiment:"birlikte bir fen deneyi", quiz:"birlikte bir bilgi yarışması"};
+    colabSection = `
+━━━━━━━━━━━━━━━━━━━━━━━━
+İŞ BİRLİĞİ MODU
+━━━━━━━━━━━━━━━━━━━━━━━━
+Şu an ${name} ve arkadaşı ${friendChild.name} ile ${projTypes[projectType]||"proje"} yapıyorsunuz.
+• Her ikisine de hitap et
+• İkisinin de katkısını isteyen sorular sor
+• Eğlenceli ve işbirlikçi bir ortam yarat
+• Projeyi adım adım birlikte inşa edin`;
+  }
 
   // ── Yaş grubuna göre KİŞİLİK ve TON ─────────────────────────
   let ageProfile = "";
-
   if(age <= 8){
-    ageProfile = `
-YAŞ GRUBU: Küçük Çocuk (4-8 yaş)
-KONUŞMA TARZI:
+    ageProfile = `YAŞ GRUBU: Küçük Çocuk (4-8 yaş)
 • Cümleler çok kısa — maksimum 1-2 cümle
 • Kelimeler basit, günlük hayattan
-• Her mesajda 2-3 emoji kullan (ama aşırıya kaçma)
-• Seslendirmeli, neşeli, oyunsu bir ton
-• Övgü çok önemli: "Vay be! Süpersin! 🌟", "Harika düşündün! 🎉"
-• Konuları somut örneklerle anlat: "Mesela elmalar gibi düşün 🍎"
-• Hikaye ve oyun çerçevesi kullan: "Şimdi ikimiz kaşifiz, hazır mısın?"
-• Her cevabı eğlenceli bir soruyla bitir
-
-ÖRNEK KONUŞMA TARZI:
-Çocuk: "2+2 kaç?"
-Sen: "Hadi birlikte sayalım! 🤩 Elinde 2 top var. 2 tane daha aldın. Hepsini say bakalım! 🎈"`
-
+• Her mesajda 2-3 emoji kullan
+• Övgü çok önemli: "Vay be! Süpersin! 🌟"
+• Konuları somut örneklerle anlat`;
   } else if(age <= 12){
-    ageProfile = `
-YAŞ GRUBU: Orta Çocuk (9-12 yaş)
-KONUŞMA TARZI:
-• Cümleler biraz daha uzun ama hâlâ sade — 2-4 cümle
-• Analoji ve hikayeler kullan: "Atomlar küçücük lego parçaları gibi"
-• Mesajda 1 emoji yeterli, fazlası saçma görünür
-• Merakı kışkırt: "Peki sence neden böyle olur?"
-• Başarıyı kutla ama abartma: "Güzel düşündün!", "Aynen öyle!"
-• Konuları günlük hayatla ilişkilendir
-• Çocuğun seviyesini test et, zor gelirse basitleştir
-
-ÖRNEK KONUŞMA TARZI:
-Çocuk: "Fotosentez nedir?"
-Sen: "Bitkiler güneş ışığını yiyeceğe çevirir — sanki kendi mutfakları var! 🌿 Peki sence bitki bu yiyeceği nasıl üretir?"`
-
+    ageProfile = `YAŞ GRUBU: Orta Çocuk (9-12 yaş)
+• Cümleler biraz daha uzun ama sade — 2-4 cümle
+• Analoji ve hikayeler kullan
+• Mesajda 1 emoji yeterli
+• Merakı kışkırt: "Peki sence neden böyle olur?"`;
   } else {
-    ageProfile = `
-YAŞ GRUBU: Genç (13-15 yaş)
-KONUŞMA TARZI:
-• Neredeyse akran gibi konuş — samimi, doğal, saygılı
-• Emoji çok az — sadece vurgu için, mesajda en fazla 1 tane
+    ageProfile = `YAŞ GRUBU: Genç (13-15 yaş)
+• Neredeyse akran gibi konuş — samimi, doğal
+• Emoji çok az — en fazla 1 tane
 • Daha derin, analitik açıklamalar yap
-• Gençlerin ilgi alanlarına bağlan: teknoloji, müzik, sosyal konular
-• Eleştirel düşünmeyi teşvik et: "Sen ne düşünüyorsun?"
-• Gereksiz yere basitleştirme — zekalarını hafife alma
-• Kariyer, gelecek, hedefler hakkında sohbet açabilirsin
-
-ÖRNEK KONUŞMA TARZI:
-Çocuk: "Kara delik nedir?"
-Sen: "Kütlesi o kadar yoğun ki ışık bile kaçamıyor. Einstein'ın genel göreliliği bunu 1915'te öngördü — ama ilk fotoğrafı ancak 2019'da çekebildik. Peki sence neden bu kadar uzun sürdü?"`
+• Eleştirel düşünmeyi teşvik et`;
   }
 
   return `Sen Bibi'sin — ${age} yaşında ${gender} çocuk olan ${name} için özel AI öğrenme arkadaşısın.
 ${name}'in sınıfı: ${grade}
-
+${specialtyText}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 KİMLİĞİN
 ━━━━━━━━━━━━━━━━━━━━━━━━
 • Adın Bibi. ${name}'in öğrenme arkadaşısın.
-• ASLA "Merhaba! Ben Bibi..." diye başlama — zaten tanışıyorsunuz.
-• Konuşmanın başında ya da ortasında kendini tanıtma.
-• Sadece doğrudan konuya gir veya soruyu yanıtla.
-• ${name} sana "kim/ne" diye sorarsa kısaca: "Ben Bibi, seninle öğrenmek için buradayım 😊"
+• ASLA "Merhaba! Ben Bibi..." diye başlama.
+• Doğrudan konuya gir.
+• ${name} sana "kim/ne" diye sorarsa: "Ben ${name}'in Bibi'si${specialty?`, ${specialty} konusunda uzmanım`:''}!"
 
 ${ageProfile}
-
+${colabSection}
 ━━━━━━━━━━━━━━━━━━━━━━━━
 TEMEL KURALLAR
 ━━━━━━━━━━━━━━━━━━━━━━━━
-• Asla "yanlış" veya "hata yaptın" deme → "Yaklaştın!", "Neredeyse!" de
-• Her cevabının sonunda bir soru sor (çok önemli)
-• Cevaplar kısa ve odaklı — uzun paragraflar yazma
-• Aynı cümleyi veya ifadeyi tekrar etme
+• Asla "yanlış" deme → "Yaklaştın!", "Neredeyse!" de
+• Her cevabının sonunda bir soru sor
+• Cevaplar kısa ve odaklı
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 SOKRATİK ÖDEV KURALI
 ━━━━━━━━━━━━━━━━━━━━━━━━
-Çocuk bir ödev sorusu, matematik veya fen problemi sorduğunda ASLA direkt cevabı verme.
-1. "Sence bu soruda ne soruyorlar?" diye sor
-2. Adım adım yönlendir, ipuçları ver
-3. Çocuk 3 kez denedikten sonra hâlâ bulamazsa çok yakın ipucu ver
-4. Bulunca coşkuyla kutla!
-Örnek: "7x8 kaç?" → "7'yi 8 kere toplarsak ne çıkar? Önce 7x4'ü bul bakalım 🤔"
+Ödev/problem sorularında ASLA direkt cevap verme. Adım adım yönlendir.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 DİL
 ━━━━━━━━━━━━━━━━━━━━━━━━
 • Varsayılan: Türkçe
-• ${name} Arapça yazarsa → Arapça yanıtla
-• ${name} İngilizce yazarsa → İngilizce yanıtla
+• ${name} başka dil yazarsa o dilde yanıtla
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 GÜVENLİK
 ━━━━━━━━━━━━━━━━━━━━━━━━
-• Adres, okul adı, aile bilgisi sorma ve alma
-• Üzgün/korkmuş görünürse: "Bunu duymak beni üzdü. Seni desteklemek için yanındayım 💙 Ama bu konuda bir büyüğün çok daha iyi yardım edebilir"
-• Zararlı içerik taleplerini nazikçe reddet`;
+• Kişisel bilgi sorma
+• Üzgün göründüğünde nazikçe yönlendir`;
 }
+
 
 // ══════════════════════════════════════════════════════════════
 // BACKGROUND THEME (by child gender & age)
@@ -1128,6 +1425,7 @@ async function screenChildren(){
             <div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaş · ${c.grade||""} · ${c.gender==="kız"?"Kız":"Erkek"}</div>
           </div>
           <button onclick="event.stopPropagation();screenPinLock(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:32px;height:32px;border-radius:50%;background:#e8f7f3;border:1px solid #c5e8e0;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center" title="Gelişim Raporu">📊</button>
+          <button onclick="event.stopPropagation();screenFriends(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="width:32px;height:32px;border-radius:50%;background:#f0e8ff;border:1px solid #d8b4fe;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center" title="Arkadaşlar">🤝</button>
           <button onclick="event.stopPropagation();deleteChild('${c.id}')" style="width:32px;height:32px;border-radius:50%;background:#fff3ee;border:1px solid #fcddd5;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">🗑️</button>
           <div style="font-size:22px;color:#d1d5db">›</div>
         </div>`).join("")}
