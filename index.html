@@ -1215,10 +1215,33 @@ function startChat(child){
           <span id="status-text" style="color:rgba(255,255,255,.6);font-size:11px;font-weight:600">${child.name} ile</span>
         </div>
       </div>
+      <!-- Sohbet geçmişi butonu -->
+      <button onclick="toggleHistory()" id="history-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Sohbet Geçmişi">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/><path d="M12 7v5l3 3" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
       <button onclick="toggleVoice()" id="voice-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
     </div>
+
+    <!-- Sohbet Geçmişi Panel (sol taraftan kayar) -->
+    <div id="history-panel" style="position:absolute;top:0;left:-110%;width:85%;max-width:320px;height:100%;background:rgba(15,25,22,0.97);backdrop-filter:blur(20px);z-index:20;transition:left .3s ease;display:flex;flex-direction:column;box-shadow:4px 0 20px rgba(0,0,0,.4)">
+      <div style="padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div style="color:white;font-size:16px;font-weight:900">📋 Sohbet Geçmişi</div>
+          <div style="color:rgba(255,255,255,.45);font-size:11px;margin-top:2px">${child.name}'in konuşmaları</div>
+        </div>
+        <button onclick="toggleHistory()" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:white;font-size:16px;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+      <div id="history-list" style="flex:1;overflow-y:auto;padding:10px 12px">
+        <div style="text-align:center;color:rgba(255,255,255,.3);font-size:13px;padding:30px 0">Yükleniyor...</div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid rgba(255,255,255,.08)">
+        <button onclick="newChat()" style="width:100%;padding:11px;border-radius:12px;border:1.5px solid rgba(13,155,126,.5);background:rgba(13,155,126,.15);color:#4ade80;font-size:14px;font-weight:700;cursor:pointer">+ Yeni Sohbet</button>
+      </div>
+    </div>
+    <!-- Backdrop -->
+    <div id="history-backdrop" onclick="toggleHistory()" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.5);z-index:19;backdrop-filter:blur(2px)"></div>
 
     <!-- Messages — fullscreen -->
     <div id="messages" style="flex:1;overflow-y:auto;padding:16px 14px 8px;display:flex;flex-direction:column;position:relative;z-index:2"></div>
@@ -1366,6 +1389,123 @@ async function sendMessage(){
     setStatus("Seninle burada!","#4ade80");
   }
 }
+
+// ── Sohbet Geçmişi ───────────────────────────────────────────
+let historyOpen = false;
+
+function toggleHistory(){
+  historyOpen = !historyOpen;
+  const panel = el("history-panel");
+  const backdrop = el("history-backdrop");
+  if(!panel||!backdrop) return;
+  panel.style.left = historyOpen ? "0" : "-110%";
+  backdrop.style.display = historyOpen ? "block" : "none";
+  if(historyOpen) loadHistory();
+}
+
+async function loadHistory(){
+  const listEl = el("history-list");
+  if(!listEl) return;
+
+  // Son 20 oturumu çek, her birinin ilk kullanıcı mesajını da al
+  const {data:sessions} = await sb.from("sessions")
+    .select("id,started_at,duration_mins,message_count")
+    .eq("child_id", currentChild.id)
+    .order("started_at",{ascending:false})
+    .limit(20);
+
+  if(!sessions||sessions.length===0){
+    listEl.innerHTML=`<div style="text-align:center;color:rgba(255,255,255,.3);font-size:13px;padding:40px 16px">Henüz sohbet geçmişi yok.<br/>Bibi ile konuştukça burada görünür 💬</div>`;
+    return;
+  }
+
+  // Her oturum için ilk kullanıcı mesajını çek
+  const sessionIds = sessions.map(s=>s.id);
+  const {data:firstMsgs} = await sb.from("messages")
+    .select("session_id,content")
+    .in("session_id", sessionIds)
+    .eq("role","user")
+    .order("created_at",{ascending:true});
+
+  // Session → first message map
+  const firstMsgMap = {};
+  (firstMsgs||[]).forEach(m=>{
+    if(!firstMsgMap[m.session_id]) firstMsgMap[m.session_id]=m.content;
+  });
+
+  listEl.innerHTML = sessions.map((s,i)=>{
+    const title = firstMsgMap[s.id]
+      ? (firstMsgMap[s.id].length>45 ? firstMsgMap[s.id].slice(0,45)+"..." : firstMsgMap[s.id])
+      : "Sohbet " + (i+1);
+    const date = new Date(s.started_at);
+    const dateStr = date.toLocaleDateString("tr-TR",{day:"numeric",month:"short"});
+    const timeStr = date.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
+    const isActive = s.id === sessionId;
+    return `
+    <div onclick="loadSession('${s.id}')" style="padding:12px 10px;border-radius:12px;margin-bottom:8px;cursor:pointer;background:${isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.04)"};border:1px solid ${isActive?"rgba(13,155,126,.4)":"rgba(255,255,255,.07)"};transition:all .2s"
+      onmouseover="this.style.background='rgba(255,255,255,.09)'"
+      onmouseout="this.style.background='${isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.04)"}'">
+      <div style="color:white;font-size:13px;font-weight:700;line-height:1.4;margin-bottom:5px">${title}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="color:rgba(255,255,255,.35);font-size:11px">${dateStr} ${timeStr}</span>
+        ${s.duration_mins ? `<span style="color:rgba(13,155,126,.7);font-size:11px;font-weight:600">${s.duration_mins} dk</span>` : ""}
+        ${s.message_count ? `<span style="color:rgba(255,255,255,.3);font-size:11px">${s.message_count} mesaj</span>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function loadSession(sid){
+  toggleHistory(); // paneli kapat
+  if(sid === sessionId) return; // zaten aktif
+
+  // Mevcut oturumu kapat
+  if(sessionId){
+    const mins=Math.round((new Date()-sessionStart)/60000);
+    await sb.from("sessions").update({ended_at:new Date().toISOString(),duration_mins:mins,message_count:messages.filter(m=>m.r==="user").length}).eq("id",sessionId);
+  }
+
+  // Seçilen oturumun mesajlarını yükle
+  const {data:oldMsgs} = await sb.from("messages")
+    .select("role,content")
+    .eq("session_id",sid)
+    .order("created_at",{ascending:true});
+
+  // Ekranı temizle ve eski mesajları yükle
+  messages=[];
+  const msgsEl=el("messages");
+  if(msgsEl) msgsEl.innerHTML="";
+  const qp=el("quick-prompts"); if(qp) qp.style.display="none";
+
+  (oldMsgs||[]).forEach(m=>{
+    addMsg(m.role==="user"?"user":"bibi", m.content);
+  });
+
+  // Bu oturumu aktif yap (devam edebilsin)
+  sessionId = sid;
+  sessionStart = new Date();
+}
+
+function newChat(){
+  toggleHistory();
+  sessionId = null;
+  messages = [];
+  const msgsEl = el("messages");
+  if(msgsEl) msgsEl.innerHTML="";
+  const qp=el("quick-prompts"); if(qp) qp.style.display="flex";
+
+  // Yeni oturum başlat
+  sb.from("sessions").insert({child_id:currentChild.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{if(data) sessionId=data.id;});
+
+  const openMsg = currentChild.age<=8
+    ? `Heyyyy ${currentChild.name}! Bugün ne öğrenmek istersin? 🎉`
+    : currentChild.age<=12
+    ? `Merhaba ${currentChild.name}! Yeni bir sohbet başlayalım mı?`
+    : `Selam ${currentChild.name}. Ne konuşacağız?`;
+  addMsg("bibi", openMsg);
+  sessionStart = new Date();
+}
+
 
 async function goBack(){
   if(sessionId){
