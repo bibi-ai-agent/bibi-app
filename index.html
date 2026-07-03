@@ -338,6 +338,12 @@ async function createInviteCode(childId){
 function screenFriends(child){
   if(typeof child==="string") child=JSON.parse(child);
 
+  // Önceki realtime subscription'ı temizle
+  if(window._friendsChannel){
+    sb.removeChannel(window._friendsChannel);
+    window._friendsChannel = null;
+  }
+
   render(`
   <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);padding:0 0 40px;position:relative;overflow:hidden">
     ${floatingBibis(4,["#0D9B7E"])}
@@ -390,6 +396,28 @@ function screenFriends(child){
   </div>`);
 
   loadFriends(child);
+
+  // Real-time: friendships tablosunda değişiklik olunca otomatik yenile
+  window._friendsChannel = sb
+    .channel(`friends-${child.id}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'friendships',
+      filter: `child_id_2=eq.${child.id}`
+    }, () => {
+      console.log("Yeni arkadaşlık bildirimi geldi!");
+      loadFriends(child);
+    })
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'friendships',
+      filter: `child_id_1=eq.${child.id}`
+    }, () => {
+      loadFriends(child);
+    })
+    .subscribe();
 }
 
 async function genInvite(childId){
