@@ -1281,7 +1281,11 @@ function startChat(child){
     </div>
   </div>`);
 
-  sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{ if(data) sessionId=data.id; });
+  sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data,error})=>{
+    if(error) console.error("Session hatası:", JSON.stringify(error));
+    if(data){ sessionId=data.id; console.log("Session ID:", sessionId); }
+    else console.warn("Session data boş geldi");
+  });
   const openMsg = child.age<=8
     ? `Heyyyy ${child.name}! Bugün benimle ne öğrenmek istersin? 🎉`
     : child.age<=12
@@ -1366,7 +1370,12 @@ async function sendMessage(){
   addTyping();
   const topic = detectTopic(text);
   const homeworkMode = isHomeworkQuestion(text);
-  if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic,language:"tr"});
+  if(sessionId){
+    const {error:mErr} = await sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic,language:"tr"});
+    if(mErr) console.error("Mesaj kayıt hatası:", JSON.stringify(mErr));
+  } else {
+    console.warn("sessionId yok, mesaj kaydedilemiyor");
+  }
   updateMastery(currentChild.id, topic);
   try{
     const res=await fetch(OPENROUTER_URL,{
@@ -1382,7 +1391,10 @@ async function sendMessage(){
     addMsg("bibi",reply);
     speak(reply);
     setTimeout(()=>{ setExpr("idle"); const w=el("bibi-face-wrap"); if(w) w.innerHTML=bibiFaceSVG("idle",44); },3000);
-    if(sessionId) sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
+    if(sessionId){
+      const {error:aErr} = await sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
+      if(aErr) console.error("Asistan mesaj hatası:", JSON.stringify(aErr));
+    }
   }catch(e){
     removeTyping(); setExpr("idle");
     addMsg("bibi","Bağlantıda sorun var 😅 Tekrar dener misin?");
