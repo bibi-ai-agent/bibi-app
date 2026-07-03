@@ -448,6 +448,7 @@ function showFriendMsg(msg, type){
 async function loadFriends(child){
   const listEl = document.getElementById("friends-list");
   if(!listEl) return;
+
   const {data:friendships=[]} = await sb.from("friendships")
     .select("*")
     .or(`child_id_1.eq.${child.id},child_id_2.eq.${child.id}`)
@@ -459,20 +460,46 @@ async function loadFriends(child){
   }
 
   const friendIds = friendships.map(f=>f.child_id_1===child.id?f.child_id_2:f.child_id_1);
-  const {data:friends=[]} = await sb.from("children").select("id,name,age,gender,bibi_specialty").in("id",friendIds);
-  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"};
+  
+  // Önce kendi çocuklarında ara, sonra view'den tamamla
+  const {data:ownFriends=[]} = await sb.from("children")
+    .select("id,name,age,gender,bibi_specialty,avatar_emoji,avatar_photo")
+    .in("id", friendIds);
 
-  listEl.innerHTML = friends.map((f,i)=>{
+  // View'den ara (başka velinin çocukları için)
+  const {data:viewFriends=[]} = await sb.from("children_invite_lookup")
+    .select("id,name,age,gender,bibi_specialty")
+    .in("id", friendIds);
+
+  // İkisini birleştir, tekrarları kaldır
+  const allFriends = [...ownFriends];
+  viewFriends.forEach(vf => {
+    if(!allFriends.find(f=>f.id===vf.id)) allFriends.push(vf);
+  });
+
+  if(allFriends.length===0){
+    listEl.innerHTML=`<div style="color:rgba(255,255,255,.3);font-size:13px;text-align:center;padding:30px 0">Arkadaş bilgileri yüklenemedi.</div>`;
+    return;
+  }
+
+  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"};
+  const avatarColors=["#7C3AED","#F59E0B","#2563EB","#EC4899","#0D9B7E"];
+
+  listEl.innerHTML = allFriends.map((f,i)=>{
     const friendship = friendships.find(fs=>fs.child_id_1===f.id||fs.child_id_2===f.id);
-    const avatarColors=["#7C3AED","#F59E0B","#2563EB","#EC4899","#0D9B7E"];
+    const avatarHtml = f.avatar_photo
+      ? `<img src="${f.avatar_photo}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+      : f.avatar_emoji
+      ? `<span style="font-size:22px">${f.avatar_emoji}</span>`
+      : f.gender==="kız" ? "👧" : "👦";
     return `
     <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s ease">
-      <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${f.gender==="kız"?"👧":"👦"}</div>
+      <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;overflow:hidden">${avatarHtml}</div>
       <div style="flex:1">
         <div style="color:white;font-size:15px;font-weight:800">${f.name}</div>
         <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${f.age} yaş ${f.bibi_specialty?`· ${specialtyIcons[f.bibi_specialty]||"⭐"} ${f.bibi_specialty} Uzmanı`:""}</div>
       </div>
-      <button onclick="startProject('${JSON.stringify(child).replace(/"/g,"'")}','${JSON.stringify(f).replace(/"/g,"'")}','${friendship?.id||""}')" style="padding:8px 14px;border-radius:12px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:12px;font-weight:800;cursor:pointer">🚀 Proje Yap</button>
+      <button onclick="startProject('${JSON.stringify(child).replace(/"/g,"'")}','${JSON.stringify({id:f.id,name:f.name,age:f.age,gender:f.gender,bibi_specialty:f.bibi_specialty}).replace(/"/g,"'")}','${friendship?.id||""}')" style="padding:8px 14px;border-radius:12px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:12px;font-weight:800;cursor:pointer">🚀 Proje Yap</button>
     </div>`;
   }).join("");
 }
