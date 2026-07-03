@@ -518,15 +518,25 @@ async function loadFriends(child){
         <div style="color:white;font-size:15px;font-weight:800">${f.name}</div>
         <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${f.age} yaş ${f.bibi_specialty?`· ${specialtyIcons[f.bibi_specialty]||"⭐"} ${f.bibi_specialty} Uzmanı`:""}</div>
       </div>
-      <button onclick="startProject('${JSON.stringify(child).replace(/"/g,"'")}','${JSON.stringify({id:f.id,name:f.name,age:f.age,gender:f.gender,bibi_specialty:f.bibi_specialty}).replace(/"/g,"'")}','${friendship?.id||""}')" style="padding:8px 14px;border-radius:12px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:12px;font-weight:800;cursor:pointer">🚀 Proje Yap</button>
+      <button onclick="startProjectById('${child.id}','${f.id}','${friendship?.id||""}')" style="padding:8px 14px;border-radius:12px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:12px;font-weight:800;cursor:pointer">🚀 Proje Yap</button>
     </div>`;
   }).join("");
 }
 
 // ── Proje İş Birliği ──────────────────────────────────────────
-function startProject(myChildStr, friendStr, friendshipId){
-  const myChild = JSON.parse(myChildStr.replace(/'/g,'"'));
-  const friend = JSON.parse(friendStr.replace(/'/g,'"'));
+async function startProjectById(myChildId, friendId, friendshipId){
+  // Her iki çocuğun bilgilerini çek
+  const {data:myChild} = await sb.from("children").select("*").eq("id",myChildId).single();
+  const {data:friend} = await sb.from("children_invite_lookup").select("*").eq("id",friendId).single();
+  if(!myChild||!friend){ alert("Bilgiler yüklenemedi, tekrar dene."); return; }
+  startProject(myChild, friend, friendshipId);
+}
+
+function startProject(myChild, friend, friendshipId){
+  // Global state'e kaydet — JSON tırnak sorununu önler
+  window._projectChild = myChild;
+  window._projectFriend = friend;
+  window._projectFriendshipId = friendshipId;
 
   render(`
   <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px">
@@ -539,33 +549,32 @@ function startProject(myChildStr, friendStr, friendshipId){
       </div>
 
       <div style="display:flex;flex-direction:column;gap:12px">
-        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','story','${friendshipId}')"
-          style="background:rgba(124,58,237,.2);border:1.5px solid rgba(124,58,237,.4);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+        <button onclick="runProjectCurrent('story')" style="background:rgba(124,58,237,.2);border:1.5px solid rgba(124,58,237,.4);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
           <div style="font-size:22px">📖</div>
           <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Hikaye Yaz</div>
           <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte yaratıcı bir hikaye yazar</div>
         </button>
-        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','experiment','${friendshipId}')"
-          style="background:rgba(13,155,126,.15);border:1.5px solid rgba(13,155,126,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+        <button onclick="runProjectCurrent('experiment')" style="background:rgba(13,155,126,.15);border:1.5px solid rgba(13,155,126,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
           <div style="font-size:22px">🔬</div>
           <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Deney Tasarla</div>
           <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte bir fen deneyi tasarlar</div>
         </button>
-        <button onclick="runProject('${JSON.stringify(myChild).replace(/"/g,"'")}','${JSON.stringify(friend).replace(/"/g,"'")}','quiz','${friendshipId}')"
-          style="background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
+        <button onclick="runProjectCurrent('quiz')" style="background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
           <div style="font-size:22px">🎯</div>
           <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Bilgi Yarışması</div>
           <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte birbirine soru sorar</div>
         </button>
       </div>
-      <button onclick="screenFriends(${JSON.stringify(myChild).replace(/"/g,"'")})" style="width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">← Geri</button>
+      <button onclick="screenFriends(window._projectChild)" style="width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">← Geri</button>
     </div>
   </div>`);
 }
 
-async function runProject(myChildStr, friendStr, projectType, friendshipId){
-  const myChild = JSON.parse(myChildStr.replace(/'/g,'"'));
-  const friend = JSON.parse(friendStr.replace(/'/g,'"'));
+function runProjectCurrent(projectType){
+  runProject(window._projectChild, window._projectFriend, projectType, window._projectFriendshipId);
+}
+
+async function runProject(myChild, friend, projectType, friendshipId){
   const typeNames = {story:"Hikaye",experiment:"Deney",quiz:"Bilgi Yarışması"};
 
   render(`
