@@ -1773,10 +1773,11 @@ async function goBack(){
 
 // ── VOICE ─────────────────────────────────────────────────────
 // ── Ses sistemi — durdur/devam et desteği ────────────────────
-let speechSentences = [];   // Cümle listesi
-let speechIndex = 0;        // Şu an okunan cümle
-let speechPaused = false;   // Duraklatıldı mı?
-let speechActive = false;   // Aktif okuma var mı?
+let speechSentences = [];
+let speechIndex = 0;
+let speechPaused = false;
+let speechActive = false;
+let currentUtterance = null;
 
 function cleanText(text){
   return text
@@ -1805,24 +1806,23 @@ function getTRVoice(){
     || null;
 }
 
-function speakSentence(index){
-  if(index >= speechSentences.length || speechPaused){
-    if(index >= speechSentences.length){
-      // Bitti
-      speechActive = false;
-      speechIndex = 0;
-      setExpr("idle");
-      setStatus(`${currentChild?.name||""} ile`,"#4ade80");
-      const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
-      updateVoiceBtn();
-    }
+function speakFromIndex(index){
+  if(index >= speechSentences.length){
+    speechActive = false;
+    speechPaused = false;
+    speechIndex = 0;
+    setExpr("idle");
+    setStatus(`${currentChild?.name||""} ile`,"#4ade80");
+    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+    updateVoiceBtn();
     return;
   }
 
-  const sentence = speechSentences[index];
-  if(!sentence.trim()){ speakSentence(index+1); return; }
+  const sentence = speechSentences[index]?.trim();
+  if(!sentence){ speakFromIndex(index+1); return; }
 
   const u = new SpeechSynthesisUtterance(sentence);
+  currentUtterance = u;
   u.lang = "tr-TR";
   const vs = getVoiceSettings();
   u.rate = vs.rate; u.pitch = vs.pitch; u.volume = vs.volume;
@@ -1836,11 +1836,19 @@ function speakSentence(index){
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44);
     updateVoiceBtn();
   };
+
   u.onend = () => {
-    if(!speechPaused) speakSentence(index+1);
+    currentUtterance = null;
+    if(!speechPaused){
+      speakFromIndex(index + 1);
+    }
   };
-  u.onerror = () => {
-    if(!speechPaused) speakSentence(index+1);
+
+  u.onerror = (e) => {
+    currentUtterance = null;
+    if(e.error !== "interrupted" && !speechPaused){
+      speakFromIndex(index + 1);
+    }
   };
 
   window.speechSynthesis.speak(u);
@@ -1849,41 +1857,51 @@ function speakSentence(index){
 function speak(text){
   if(!window.speechSynthesis) return;
 
-  // Yeni metin başlıyor — sıfırla
+  // Öncekini durdur
   window.speechSynthesis.cancel();
+  currentUtterance = null;
   speechPaused = false;
   speechActive = false;
 
   const clean = cleanText(text);
   if(!clean) return;
 
-  // Metni cümlelere böl (. ! ? sonrası)
-  speechSentences = clean.match(/[^.!?]+[.!?]?/g)?.filter(s=>s.trim()) || [clean];
+  // Cümlelere böl
+  speechSentences = clean.split(/(?<=[.!?])\s+/).filter(s=>s.trim().length > 0);
+  if(speechSentences.length === 0) speechSentences = [clean];
   speechIndex = 0;
 
-  speakSentence(0);
+  // Küçük gecikme — cancel'in bitmesini bekle
+  setTimeout(() => speakFromIndex(0), 100);
 }
 
-function toggleSpeech(){
-  if(!window.speechSynthesis) return;
+function pauseSpeech(){
+  if(!speechActive || speechPaused) return;
+  speechPaused = true;
+  speechActive = false;
+  window.speechSynthesis.cancel(); // Chrome'da pause çalışmıyor, cancel kullan
+  currentUtterance = null;
+  // speechIndex zaten doğru cümlede — cancel sonrası o cümleden başlayacak
+  setExpr("idle");
+  setStatus("Duraklatıldı ⏸","#fbbf24");
+  const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+  updateVoiceBtn();
+}
 
+function resumeSpeech(){
+  if(!speechPaused) return;
+  speechPaused = false;
+  setTimeout(() => speakFromIndex(speechIndex), 100);
+}
+
+function toggleVoice(){
   if(speechActive && !speechPaused){
-    // Durdur
-    window.speechSynthesis.cancel();
-    speechPaused = true;
-    speechActive = false;
-    setExpr("idle");
-    setStatus("Duraklatıldı ⏸","#fbbf24");
-    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
-    updateVoiceBtn();
+    pauseSpeech();
   } else if(speechPaused){
-    // Kaldığı yerden devam et
-    speechPaused = false;
-    speakSentence(speechIndex);
+    resumeSpeech();
   } else {
-    // Ses kapalıysa aç
     voiceOn = !voiceOn;
-    const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+    if(!voiceOn){ window.speechSynthesis.cancel(); speechActive=false; speechPaused=false; }
     updateVoiceBtn();
   }
 }
@@ -1892,27 +1910,20 @@ function updateVoiceBtn(){
   const btn = el("voice-btn");
   if(!btn) return;
   if(speechActive && !speechPaused){
-    // Konuşuyor — durdur ikonu göster
-    btn.style.background = "rgba(167,139,250,.3)";
+    btn.style.background = "rgba(167,139,250,.35)";
     btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white"/></svg>`;
     btn.title = "Durdur";
   } else if(speechPaused){
-    // Duraklatıldı — devam et ikonu göster
-    btn.style.background = "rgba(251,191,36,.3)";
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>`;
+    btn.style.background = "rgba(251,191,36,.35)";
+    btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>`;
     btn.title = "Devam et";
   } else {
-    // Normal ses butonu
     btn.style.background = voiceOn ? "rgba(255,255,255,.2)" : "rgba(0,0,0,.3)";
     btn.innerHTML = voiceOn
       ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
       : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>`;
     btn.title = voiceOn ? "Sesi kapat" : "Sesi aç";
   }
-}
-
-function toggleVoice(){
-  toggleSpeech();
 }
 
 function toggleMic(){
