@@ -1291,6 +1291,7 @@ async function saveAvatarPhoto(input, childId){
 }
 
 
+function showAddForm(){ el("add-form").classList.remove("hidden"); el("show-add-btn").classList.add("hidden"); }
 function hideAddForm(){ el("add-form").classList.add("hidden"); el("show-add-btn").classList.remove("hidden"); }
 
 async function addChild(){
