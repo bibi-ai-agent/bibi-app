@@ -1114,7 +1114,14 @@ async function screenChildren(){
       <div id="children-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
         ${list.map((c,i)=>`
         <div onclick="startChat(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="background:white;border-radius:18px;padding:16px 18px;box-shadow:0 4px 20px rgba(0,0,0,.08);cursor:pointer;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.14)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'">
-          <div style="width:54px;height:54px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.15)">${c.gender==="kız"?"👧":"👦"}</div>
+          <div style="width:54px;height:54px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:${c.avatar_photo?'':'22px'};color:white;font-weight:900;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.15);overflow:hidden">
+          ${c.avatar_photo
+            ? `<img src="${c.avatar_photo}" style="width:100%;height:100%;object-fit:cover"/>`
+            : c.avatar_emoji
+            ? `<span style="font-size:26px">${c.avatar_emoji}</span>`
+            : c.gender==="kız" ? "👧" : "👦"
+          }
+        </div>
           <div style="flex:1">
             <div style="font-size:17px;font-weight:800;color:#1A2E2A">${c.name}</div>
             <div style="font-size:13px;color:#6B7280;margin-top:2px">${c.age} yaş · ${c.grade||""} · ${c.gender==="kız"?"Kız":"Erkek"}</div>
@@ -1129,6 +1136,30 @@ async function screenChildren(){
       <div id="add-form" class="hidden" style="background:white;border-radius:18px;padding:22px 20px;box-shadow:0 4px 20px rgba(0,0,0,.08);margin-bottom:16px;animation:fadeUp .3s ease">
         <div style="font-size:16px;font-weight:800;color:#1A2E2A;margin-bottom:16px">Yeni Profil Ekle</div>
         <div style="display:flex;flex-direction:column;gap:10px">
+
+          <!-- Avatar seçimi -->
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#6B7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Profil Fotoğrafı</div>
+            <!-- Fotoğraf yükleme -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+              <div id="avatar-preview" onclick="document.getElementById('avatar-upload').click()" style="width:72px;height:72px;border-radius:50%;background:#e8f7f3;border:2.5px dashed #0D9B7E;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;flex-shrink:0;transition:all .2s" title="Fotoğraf yükle">
+                <div id="avatar-preview-inner" style="font-size:28px">📷</div>
+              </div>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:#1A2E2A">Fotoğraf yükle</div>
+                <div style="font-size:11px;color:#9CA3AF;margin-top:2px">Galeriden seç veya aşağıdan emoji seç</div>
+                <button onclick="document.getElementById('avatar-upload').click()" style="margin-top:6px;padding:5px 12px;border-radius:8px;border:1.5px solid #e0f0ec;background:white;color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">📁 Galeriden Seç</button>
+              </div>
+              <input type="file" id="avatar-upload" accept="image/*" style="display:none" onchange="handleAvatarUpload(this)"/>
+            </div>
+            <!-- Emoji avatar seçenekleri -->
+            <div style="font-size:11px;font-weight:700;color:#9CA3AF;margin-bottom:6px">veya emoji seç:</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              ${["🐱","🐶","🦊","🐸","🐼","🐨","🦁","🐯","🐻","🦄","🐙","🦋","⭐","🌈","🚀","🎮","🎨","🎵","⚽","🏀"].map(e=>`
+              <button onclick="selectEmoji('${e}')" class="emoji-av" style="width:38px;height:38px;border-radius:50%;border:2px solid #e0f0ec;background:#f9fafb;font-size:20px;cursor:pointer;transition:all .2s">${e}</button>`).join("")}
+            </div>
+          </div>
+
           <input id="new-name" placeholder="Çocuğun adı" class="inp-light"/>
           <div style="display:flex;gap:8px">
             <button onclick="selectNewGender('kız')" id="ng-kiz" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👧 Kız</button>
@@ -1156,7 +1187,42 @@ async function screenChildren(){
   </div>`);
 }
 
-let newGender = "";
+let newGender = "", newAvatarData = "", newAvatarType = ""; // type: "emoji" | "photo" | ""
+
+function selectEmoji(emoji){
+  newAvatarData = emoji;
+  newAvatarType = "emoji";
+  // Önizleme güncelle
+  const inner = document.getElementById("avatar-preview-inner");
+  const preview = document.getElementById("avatar-preview");
+  if(inner) inner.innerHTML = `<span style="font-size:36px">${emoji}</span>`;
+  if(preview) preview.style.border = "2.5px solid #0D9B7E";
+  // Seçilen emoji butonunu vurgula
+  document.querySelectorAll(".emoji-av").forEach(btn=>{
+    btn.style.borderColor = btn.textContent===emoji ? "#0D9B7E" : "#e0f0ec";
+    btn.style.background = btn.textContent===emoji ? "#e8f7f3" : "#f9fafb";
+    btn.style.transform = btn.textContent===emoji ? "scale(1.2)" : "scale(1)";
+  });
+}
+
+function handleAvatarUpload(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(file.size > 2*1024*1024){ alert("Fotoğraf 2MB'dan küçük olmalı."); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    newAvatarData = e.target.result; // base64
+    newAvatarType = "photo";
+    const inner = document.getElementById("avatar-preview-inner");
+    const preview = document.getElementById("avatar-preview");
+    if(inner) inner.innerHTML = `<img src="${newAvatarData}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+    if(preview){ preview.style.border = "2.5px solid #0D9B7E"; preview.style.padding="0"; }
+    // Emoji seçimlerini temizle
+    document.querySelectorAll(".emoji-av").forEach(btn=>{ btn.style.borderColor="#e0f0ec"; btn.style.background="#f9fafb"; btn.style.transform="scale(1)"; });
+  };
+  reader.readAsDataURL(file);
+}
+
 function selectNewGender(g){
   newGender=g;
   ["kiz","erkek"].forEach(id=>{
@@ -1173,8 +1239,13 @@ function hideAddForm(){ el("add-form").classList.add("hidden"); el("show-add-btn
 async function addChild(){
   const name=el("new-name")?.value.trim(), age=el("new-age")?.value, grade=el("new-grade")?.value;
   if(!name||!age||!newGender){ alert("Ad, cinsiyet ve yaş zorunlu!"); return; }
-  await sb.from("children").insert({parent_id:currentUser.id,name,age:parseInt(age),gender:newGender,grade,language:"tr"});
-  newGender=""; screenChildren();
+  const avatarCol = newAvatarType==="photo" ? "avatar_photo" : newAvatarType==="emoji" ? "avatar_emoji" : null;
+  const insertData = {parent_id:currentUser.id, name, age:parseInt(age), gender:newGender, grade, language:"tr"};
+  if(newAvatarType==="emoji") insertData.avatar_emoji = newAvatarData;
+  if(newAvatarType==="photo") insertData.avatar_photo = newAvatarData;
+  await sb.from("children").insert(insertData);
+  newGender=""; newAvatarData=""; newAvatarType="";
+  screenChildren();
 }
 
 async function deleteChild(id){
