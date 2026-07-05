@@ -2084,16 +2084,19 @@ async function screenChildren(){
   render(`
   <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
     ${bubblesBg}
-    <div style="position:relative;z-index:2;padding:28px 20px 60px;max-width:500px;margin:0 auto">
-      <!-- Header -->
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:28px">
-        <div>
-          <div style="font-size:22px;font-weight:900;color:#1A2E2A">Merhaba! 👋</div>
-          <div style="font-size:13px;color:#6B7280;margin-top:2px" id="parent-name-display">${parentDisplay}</div>
+    <div style="position:relative;z-index:2;padding:0 0 60px;max-width:500px;margin:0 auto">
+      <!-- Header — güvenli bölge -->
+      <div style="position:sticky;top:0;z-index:10;background:rgba(248,251,250,0.92);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(13,155,126,.08);padding:20px 20px 14px;margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-size:22px;font-weight:900;color:#1A2E2A">Merhaba! 👋</div>
+            <div style="font-size:13px;color:#6B7280;margin-top:2px" id="parent-name-display">${parentDisplay}</div>
+          </div>
+          <button onclick="signOut()" style="padding:8px 18px;border-radius:20px;background:white;border:1.5px solid #e0f0ec;color:#6B7280;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06)">Çıkış</button>
         </div>
-        <button onclick="signOut()" style="padding:8px 18px;border-radius:20px;background:white;border:1.5px solid #e0f0ec;color:#6B7280;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.06)">Çıkış</button>
       </div>
 
+      <div style="padding:0 20px">
       <div style="font-size:12px;font-weight:800;color:#0D9B7E;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">Kim oynayacak?</div>
 
       <!-- Children list -->
@@ -2175,6 +2178,7 @@ async function screenChildren(){
       <button id="show-add-btn" onclick="showAddForm()" style="width:100%;padding:15px;border-radius:18px;border:2.5px dashed #b8ddd6;background:rgba(255,255,255,.7);color:#0D9B7E;font-size:15px;font-weight:800;cursor:pointer;transition:all .2s" onmouseover="this.style.background='white'" onmouseout="this.style.background='rgba(255,255,255,.7)'">
         + Yeni Profil Ekle
       </button>
+      </div><!-- end padding -->
     </div>
   </div>`);
 }
