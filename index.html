@@ -335,6 +335,150 @@ async function createInviteCode(childId){
 }
 
 // ── Arkadaş Ekle Ekranı ───────────────────────────────────────
+// ── Global proje daveti dinleyici ────────────────────────────
+function startGlobalInviteListener(children){
+  if(window._globalInviteChannel) sb.removeChannel(window._globalInviteChannel);
+  const childIds = children.map(c=>c.id);
+  if(childIds.length===0) return;
+
+  window._globalInviteChannel = sb
+    .channel('global-invites-'+Date.now())
+    .on('postgres_changes',{
+      event:'INSERT', schema:'public', table:'project_invites'
+    }, async payload => {
+      const inv = payload.new;
+      if(!childIds.includes(inv.to_child_id)) return;
+      if(inv.status !== 'pending') return;
+      const {data:fromChild} = await sb.from("children_invite_lookup")
+        .select("id,name,gender,bibi_specialty").eq("id",inv.from_child_id).single();
+      const toChild = children.find(c=>c.id===inv.to_child_id);
+      if(!fromChild||!toChild) return;
+      showInviteNotification(fromChild, toChild, inv);
+    })
+    .subscribe();
+}
+
+function showInviteNotification(fromChild, toChild, invite){
+  const typeNames = {story:"Hikaye Yazma",experiment:"Deney Tasarlama",quiz:"Bilgi Yarışması"};
+  const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
+  const typeName = typeNames[invite.project_type]||"Proje";
+  const typeIcon = typeIcons[invite.project_type]||"🚀";
+
+  const old = document.getElementById("invite-notification");
+  if(old){ clearInterval(old._timer); old.remove(); }
+
+  const notif = document.createElement("div");
+  notif.id = "invite-notification";
+  notif.style.cssText = "position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:400px;background:linear-gradient(135deg,#1A2E2A,#243d38);border:1.5px solid rgba(124,58,237,.5);border-radius:20px;padding:18px 18px 16px;box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:9999;animation:fadeUp .4s ease;font-family:'Nunito',sans-serif;";
+  notif.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div style="font-size:32px">${typeIcon}</div>
+      <div style="flex:1">
+        <div style="color:white;font-size:14px;font-weight:900">${fromChild.name} seni ${typeName} projesine davet ediyor!</div>
+        <div style="color:rgba(255,255,255,.45);font-size:12px;margin-top:2px">${toChild.name} olarak katılacaksın</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="rejectProjectInvite('${invite.id}')"
+        style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;cursor:pointer">Reddet</button>
+      <button onclick="acceptProjectInvite('${invite.id}','${fromChild.id}','${toChild.id}','${invite.friendship_id}','${invite.project_type}')"
+        style="flex:2;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#0D9B7E);color:white;font-weight:900;font-size:14px;cursor:pointer">✅ Katıl!</button>
+    </div>
+    <div style="text-align:center;margin-top:10px">
+      <div id="invite-timer" style="color:rgba(255,255,255,.3);font-size:11px">30 saniye içinde yanıt ver</div>
+    </div>`;
+  document.body.appendChild(notif);
+
+  let secs = 30;
+  const timer = setInterval(()=>{
+    secs--;
+    const t = document.getElementById("invite-timer");
+    if(t) t.textContent = `${secs} saniye içinde yanıt ver`;
+    if(secs<=0){ clearInterval(timer); rejectProjectInvite(invite.id); }
+  },1000);
+  notif._timer = timer;
+}
+
+async function acceptProjectInvite(inviteId, fromChildId, toChildId, friendshipId, projectType){
+  const notif = document.getElementById("invite-notification");
+  if(notif){ clearInterval(notif._timer); notif.remove(); }
+  await sb.from("project_invites").update({status:"accepted"}).eq("id",inviteId);
+  const {data:toChild} = await sb.from("children").select("*").eq("id",toChildId).single();
+  const {data:fromChild} = await sb.from("children_invite_lookup").select("*").eq("id",fromChildId).single();
+  if(!toChild||!fromChild){ alert("Bilgiler yüklenemedi"); return; }
+  window._projectChild = toChild;
+  window._projectFriend = fromChild;
+  window._projectFriendshipId = friendshipId;
+  runProject(toChild, fromChild, projectType, friendshipId);
+}
+
+async function rejectProjectInvite(inviteId){
+  const notif = document.getElementById("invite-notification");
+  if(notif){ clearInterval(notif._timer); notif.remove(); }
+  await sb.from("project_invites").update({status:"rejected"}).eq("id",inviteId);
+}
+
+// ── Davet bekleme ekranı (gönderen taraf) ────────────────────
+function screenWaitingForAccept(myChild, friend, projectType, inviteId){
+  const typeNames = {story:"Hikaye Yazma",experiment:"Deney Tasarlama",quiz:"Bilgi Yarışması"};
+  const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
+    ${floatingBibis(4,["#0D9B7E","#7C3AED"])}
+    <div style="width:100%;max-width:380px;position:relative;z-index:2;text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:48px;margin-bottom:16px;animation:bounce 1.5s ease-in-out infinite">${typeIcons[projectType]||"🚀"}</div>
+      <div style="color:white;font-size:20px;font-weight:900;margin-bottom:8px">${typeNames[projectType]||"Proje"} Daveti Gönderildi!</div>
+      <div style="color:rgba(255,255,255,.5);font-size:14px;margin-bottom:32px">${friend.name}'in kabul etmesi bekleniyor...</div>
+      <div style="display:flex;justify-content:center;gap:16px;margin-bottom:32px">
+        <div style="text-align:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:#0D9B7E;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 8px">${myChild.gender==="kız"?"👧":"👦"}</div>
+          <div style="color:white;font-size:12px;font-weight:700">${myChild.name}</div>
+          <div style="color:#4ade80;font-size:11px">Hazır ✓</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding-bottom:20px">
+          ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;animation:dotPulse 1.2s ease ${i*.25}s infinite"></div>`).join("")}
+        </div>
+        <div style="text-align:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.1);border:2px dashed rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 8px;animation:pulse 1.5s ease-in-out infinite">${friend.gender==="kız"?"👧":"👦"}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700">${friend.name}</div>
+          <div style="color:rgba(255,255,255,.35);font-size:11px">Bekleniyor...</div>
+        </div>
+      </div>
+      <button onclick="cancelInvite('${inviteId}')" style="padding:12px 28px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">İptal Et</button>
+    </div>
+  </div>`);
+
+  if(window._inviteChannel) sb.removeChannel(window._inviteChannel);
+  window._inviteChannel = sb
+    .channel(`invite-wait-${inviteId}`)
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'project_invites',filter:`id=eq.${inviteId}`}, payload => {
+      const status = payload.new.status;
+      if(status==="accepted"){
+        sb.removeChannel(window._inviteChannel);
+        runProject(myChild, friend, projectType, window._projectFriendshipId);
+      } else if(status==="rejected"){
+        sb.removeChannel(window._inviteChannel);
+        render(`
+        <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px">
+          <div style="text-align:center;animation:fadeUp .4s ease">
+            <div style="font-size:48px;margin-bottom:16px">😕</div>
+            <div style="color:white;font-size:18px;font-weight:900;margin-bottom:8px">${friend.name} şu an müsait değil</div>
+            <div style="color:rgba(255,255,255,.5);font-size:14px;margin-bottom:28px">Daha sonra tekrar deneyebilirsin</div>
+            <button onclick="screenFriends(window._projectChild)" style="padding:12px 28px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer">Arkadaşlara Dön</button>
+          </div>
+        </div>`);
+      }
+    })
+    .subscribe();
+}
+
+async function cancelInvite(inviteId){
+  await sb.from("project_invites").update({status:"rejected"}).eq("id",inviteId);
+  if(window._inviteChannel) sb.removeChannel(window._inviteChannel);
+  screenFriends(window._projectChild);
+}
+
 function screenFriends(child){
   if(typeof child==="string") child=JSON.parse(child);
 
@@ -533,41 +677,147 @@ async function startProjectById(myChildId, friendId, friendshipId){
 }
 
 function startProject(myChild, friend, friendshipId){
-  // Global state'e kaydet — JSON tırnak sorununu önler
   window._projectChild = myChild;
   window._projectFriend = friend;
   window._projectFriendshipId = friendshipId;
 
+  const typeNames = {story:"Hikaye Yaz",experiment:"Deney Tasarla",quiz:"Bilgi Yarışması"};
+  const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
+  const typeDescs = {story:"İki Bibi birlikte yaratıcı bir hikaye yazar",experiment:"İki Bibi birlikte bir fen deneyi tasarlar",quiz:"İki Bibi birlikte birbirine soru sorar"};
+  const typeBgs = {story:"rgba(124,58,237,.2)",experiment:"rgba(13,155,126,.15)",quiz:"rgba(245,158,11,.12)"};
+  const typeBorders = {story:"rgba(124,58,237,.4)",experiment:"rgba(13,155,126,.3)",quiz:"rgba(245,158,11,.3)"};
+
   render(`
-  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
     ${floatingBibis(4,["#0D9B7E","#7C3AED"])}
     <div style="width:100%;max-width:420px;position:relative;z-index:2;animation:fadeUp .4s ease">
       <div style="text-align:center;margin-bottom:28px">
-        <div style="font-size:36px;margin-bottom:8px">🤝</div>
+        <div style="font-size:36px;margin-bottom:8px">🚀</div>
         <div style="color:white;font-size:20px;font-weight:900">${myChild.name} & ${friend.name}</div>
-        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px">Birlikte proje yapacaksınız!</div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px">Hangi projeyi yapmak istiyorsun?</div>
+        <div style="color:rgba(255,255,255,.35);font-size:12px;margin-top:6px">${friend.name}'e bildirim gidecek ve onaylaması beklenecek</div>
       </div>
 
       <div style="display:flex;flex-direction:column;gap:12px">
-        <button onclick="runProjectCurrent('story')" style="background:rgba(124,58,237,.2);border:1.5px solid rgba(124,58,237,.4);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
-          <div style="font-size:22px">📖</div>
-          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Hikaye Yaz</div>
-          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte yaratıcı bir hikaye yazar</div>
-        </button>
-        <button onclick="runProjectCurrent('experiment')" style="background:rgba(13,155,126,.15);border:1.5px solid rgba(13,155,126,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
-          <div style="font-size:22px">🔬</div>
-          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Deney Tasarla</div>
-          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte bir fen deneyi tasarlar</div>
-        </button>
-        <button onclick="runProjectCurrent('quiz')" style="background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.3);border-radius:16px;padding:18px;cursor:pointer;text-align:left">
-          <div style="font-size:22px">🎯</div>
-          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">Bilgi Yarışması</div>
-          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">İki Bibi birlikte birbirine soru sorar</div>
-        </button>
+        ${Object.keys(typeNames).map(type=>`
+        <button onclick="sendProjectInvite('${type}')"
+          style="background:${typeBgs[type]};border:1.5px solid ${typeBorders[type]};border-radius:16px;padding:18px;cursor:pointer;text-align:left;transition:all .2s"
+          onmouseover="this.style.transform='translateY(-2px)'"
+          onmouseout="this.style.transform=''">
+          <div style="font-size:22px">${typeIcons[type]}</div>
+          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">${typeNames[type]}</div>
+          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">${typeDescs[type]}</div>
+        </button>`).join("")}
       </div>
       <button onclick="screenFriends(window._projectChild)" style="width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">← Geri</button>
     </div>
   </div>`);
+}
+
+// ── Proje daveti gönder ───────────────────────────────────────
+async function sendProjectInvite(projectType){
+  const myChild = window._projectChild;
+  const friend = window._projectFriend;
+  const friendshipId = window._projectFriendshipId;
+  const typeNames = {story:"Hikaye Yazma",experiment:"Deney Tasarlama",quiz:"Bilgi Yarışması"};
+
+  // Önce bekleyen davet var mı kontrol et
+  const {data:existing} = await sb.from("project_invites")
+    .select("id").eq("friendship_id",friendshipId).eq("status","pending");
+  if(existing&&existing.length>0){
+    await sb.from("project_invites").delete().eq("friendship_id",friendshipId).eq("status","pending");
+  }
+
+  // Yeni davet oluştur
+  const {data:invite, error} = await sb.from("project_invites").insert({
+    friendship_id: friendshipId,
+    from_child_id: myChild.id,
+    to_child_id: friend.id,
+    status: "pending",
+    project_type: projectType
+  }).select().single();
+
+  if(error){ alert("Davet gönderilemedi: "+error.message); return; }
+
+  // Bekleme ekranı göster
+  screenWaitingForAccept(myChild, friend, projectType, invite.id);
+}
+
+// ── Davet bekleme ekranı (gönderen taraf) ────────────────────
+function screenWaitingForAccept(myChild, friend, projectType, inviteId){
+  const typeNames = {story:"Hikaye Yazma",experiment:"Deney Tasarlama",quiz:"Bilgi Yarışması"};
+  const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
+    ${floatingBibis(4,["#0D9B7E","#7C3AED"])}
+    <div style="width:100%;max-width:380px;position:relative;z-index:2;text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:48px;margin-bottom:16px;animation:bounce 1.5s ease-in-out infinite">${typeIcons[projectType]}</div>
+      <div style="color:white;font-size:20px;font-weight:900;margin-bottom:8px">${typeNames[projectType]} Daveti Gönderildi!</div>
+      <div style="color:rgba(255,255,255,.5);font-size:14px;margin-bottom:32px">${friend.name}'in kabul etmesi bekleniyor...</div>
+
+      <!-- Animasyonlu bekleme -->
+      <div style="display:flex;justify-content:center;gap:16px;margin-bottom:32px">
+        <div style="text-align:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:#0D9B7E;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 8px">${myChild.gender==="kız"?"👧":"👦"}</div>
+          <div style="color:white;font-size:12px;font-weight:700">${myChild.name}</div>
+          <div style="color:#4ade80;font-size:11px">Hazır ✓</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:4px;padding-bottom:20px">
+          ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#7C3AED;animation:dotPulse 1.2s ease ${i*.25}s infinite"></div>`).join("")}
+        </div>
+        <div style="text-align:center">
+          <div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.1);border:2px dashed rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 8px;animation:pulse 1.5s ease-in-out infinite">${friend.gender==="kız"?"👧":"👦"}</div>
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:700">${friend.name}</div>
+          <div style="color:rgba(255,255,255,.35);font-size:11px">Bekleniyor...</div>
+        </div>
+      </div>
+
+      <button onclick="cancelInvite('${inviteId}')" style="padding:12px 28px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">İptal Et</button>
+    </div>
+  </div>`);
+
+  // Realtime: karşı taraf kabul/red edince anında bildir
+  if(window._inviteChannel) sb.removeChannel(window._inviteChannel);
+  window._inviteChannel = sb
+    .channel(`invite-${inviteId}`)
+    .on('postgres_changes',{
+      event:'UPDATE', schema:'public', table:'project_invites',
+      filter:`id=eq.${inviteId}`
+    }, payload => {
+      const status = payload.new.status;
+      if(status==="accepted"){
+        sb.removeChannel(window._inviteChannel);
+        runProject(myChild, friend, projectType, window._projectFriendshipId);
+      } else if(status==="rejected"){
+        sb.removeChannel(window._inviteChannel);
+        showInviteResult(myChild, friend, "rejected");
+      }
+    })
+    .subscribe();
+}
+
+// ── Davet sonucu göster ───────────────────────────────────────
+function showInviteResult(myChild, friend, result){
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px">
+    <div style="text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:48px;margin-bottom:16px">${result==="rejected"?"😕":"🎉"}</div>
+      <div style="color:white;font-size:18px;font-weight:900;margin-bottom:8px">
+        ${result==="rejected"?`${friend.name} şu an müsait değil`:"Proje başladı!"}
+      </div>
+      <div style="color:rgba(255,255,255,.5);font-size:14px;margin-bottom:28px">
+        ${result==="rejected"?"Daha sonra tekrar deneyebilirsin":"Harika!"}
+      </div>
+      <button onclick="screenFriends(window._projectChild)" style="padding:12px 28px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer">Arkadaşlara Dön</button>
+    </div>
+  </div>`);
+}
+
+async function cancelInvite(inviteId){
+  await sb.from("project_invites").update({status:"rejected"}).eq("id",inviteId);
+  if(window._inviteChannel) sb.removeChannel(window._inviteChannel);
+  screenFriends(window._projectChild);
 }
 
 function runProjectCurrent(projectType){
@@ -1449,6 +1699,9 @@ async function screenChildren(){
   const parentDisplay = parentData?.full_name || currentUser?.email || "";
   const bubblesBg = floatingBubbles(list||[]);
   const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
+
+  // Tüm çocuklar için proje davetlerini dinle
+  startGlobalInviteListener(list||[]);
 
   render(`
   <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
