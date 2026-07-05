@@ -2422,18 +2422,6 @@ async function saveAvatarEmoji(emoji, childId){
   screenChildren();
 }
 
-async function saveAvatarPhoto(input, childId){
-  const file = input.files[0];
-  if(!file) return;
-  if(file.size > 2*1024*1024){ alert("Fotoğraf 2MB'dan küçük olmalı."); return; }
-  const reader = new FileReader();
-  reader.onload = async e => {
-    await sb.from("children").update({avatar_photo:e.target.result, avatar_emoji:null}).eq("id",childId);
-    closeAvatarModal();
-    screenChildren();
-  };
-  reader.readAsDataURL(file);
-}
 
 
 function showAddForm(){ el("add-form").classList.remove("hidden"); el("show-add-btn").classList.add("hidden"); }
