@@ -335,6 +335,46 @@ async function createInviteCode(childId){
 }
 
 // ── Arkadaş Ekle Ekranı ───────────────────────────────────────
+// ── Bekleyen davetleri kontrol et (uygulama açılınca) ────────
+async function checkPendingInvites(children){
+  const childIds = children.map(c=>c.id);
+  if(childIds.length===0) return;
+
+  const now = new Date().toISOString();
+
+  // Süresi dolmuş davetleri pasife al
+  await sb.from("project_invites")
+    .update({status:"rejected"})
+    .eq("status","pending")
+    .lt("expires_at", now);
+
+  // Bekleyen aktif davetleri çek
+  for(const childId of childIds){
+    const {data:invites} = await sb.from("project_invites")
+      .select("*")
+      .eq("to_child_id", childId)
+      .eq("status","pending")
+      .gt("expires_at", now)
+      .order("created_at",{ascending:false})
+      .limit(1);
+
+    if(!invites||invites.length===0) continue;
+
+    const invite = invites[0];
+    const {data:fromChild} = await sb.from("children_invite_lookup")
+      .select("id,name,gender,bibi_specialty")
+      .eq("id",invite.from_child_id).single();
+    const toChild = children.find(c=>c.id===childId);
+    if(!fromChild||!toChild) continue;
+
+    // Kalan süreyi hesapla
+    const expiresAt = new Date(invite.expires_at);
+    const remaining = Math.max(0, Math.floor((expiresAt - new Date())/1000/60)); // dakika
+
+    showInviteNotification(fromChild, toChild, invite, remaining);
+  }
+}
+
 // ── Global proje daveti dinleyici ────────────────────────────
 function startGlobalInviteListener(children){
   if(window._globalInviteChannel) sb.removeChannel(window._globalInviteChannel);
@@ -358,7 +398,7 @@ function startGlobalInviteListener(children){
     .subscribe();
 }
 
-function showInviteNotification(fromChild, toChild, invite){
+function showInviteNotification(fromChild, toChild, invite, remainingMins=null){
   const typeNames = {story:"Hikaye Yazma",experiment:"Deney Tasarlama",quiz:"Bilgi Yarışması"};
   const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
   const typeName = typeNames[invite.project_type]||"Proje";
@@ -385,18 +425,14 @@ function showInviteNotification(fromChild, toChild, invite){
         style="flex:2;padding:11px;border-radius:12px;border:none;background:linear-gradient(135deg,#7C3AED,#0D9B7E);color:white;font-weight:900;font-size:14px;cursor:pointer">✅ Katıl!</button>
     </div>
     <div style="text-align:center;margin-top:10px">
-      <div id="invite-timer" style="color:rgba(255,255,255,.3);font-size:11px">30 saniye içinde yanıt ver</div>
+      <div style="color:rgba(255,255,255,.3);font-size:11px">
+        ${remainingMins!==null ? `${remainingMins} dakika kaldı` : "3 saat boyunca aktif kalır"}
+      </div>
     </div>`;
   document.body.appendChild(notif);
 
-  let secs = 30;
-  const timer = setInterval(()=>{
-    secs--;
-    const t = document.getElementById("invite-timer");
-    if(t) t.textContent = `${secs} saniye içinde yanıt ver`;
-    if(secs<=0){ clearInterval(timer); rejectProjectInvite(invite.id); }
-  },1000);
-  notif._timer = timer;
+  // Timer yok — 3 saat boyunca aktif kalır
+  notif._timer = null;
 }
 
 async function acceptProjectInvite(inviteId, fromChildId, toChildId, friendshipId, projectType){
@@ -729,12 +765,14 @@ async function sendProjectInvite(projectType){
   }
 
   // Yeni davet oluştur
+  const expiresAt = new Date(Date.now() + 3*60*60*1000).toISOString(); // 3 saat
   const {data:invite, error} = await sb.from("project_invites").insert({
     friendship_id: friendshipId,
     from_child_id: myChild.id,
     to_child_id: friend.id,
     status: "pending",
-    project_type: projectType
+    project_type: projectType,
+    expires_at: expiresAt
   }).select().single();
 
   if(error){ alert("Davet gönderilemedi: "+error.message); return; }
@@ -1702,6 +1740,9 @@ async function screenChildren(){
 
   // Tüm çocuklar için proje davetlerini dinle
   startGlobalInviteListener(list||[]);
+
+  // Bekleyen davetleri kontrol et (uygulama açılınca)
+  checkPendingInvites(list||[]);
 
   render(`
   <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
