@@ -94,7 +94,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // STATE
 // ══════════════════════════════════════════════════════════════
 let currentUser = null, currentChild = null, sessionId = null;
-let sessionStart = null, messages = [], voiceOn = true;
+let sessionStart = null, messages = [], voiceOn = false;
 let isListening = false, recognition = null;
 
 // ══════════════════════════════════════════════════════════════
@@ -2725,8 +2725,9 @@ async function startChat(child){
       <button onclick="toggleHistory()" id="history-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Sohbet Geçmişi">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="white" stroke-width="2"/><path d="M12 7v5l3 3" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
-      <button onclick="toggleVoice()" id="voice-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      <button onclick="toggleVoice()" id="voice-btn" style="border-radius:20px;background:rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;padding:6px 12px;gap:5px" title="Sesi Aç/Kapat">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>
+        <span style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700">Ses Kapalı</span>
       </button>
       <button onclick="showVoiceSelector()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Ses Seç">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="white" stroke-width="2"/><path d="M6 20v-2a6 6 0 0 1 12 0v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
@@ -2947,7 +2948,7 @@ async function sendMessage(){
     setExpr("happy"); setStatus("Seninle burada!","#4ade80");
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("happy",44);
     addMsg("bibi",reply);
-    speak(reply);
+    // speak(reply); — otomatik ses kapalı, kullanıcı ▶ butonuna basarsa çalar
     setTimeout(()=>{ setExpr("idle"); const w=el("bibi-face-wrap"); if(w) w.innerHTML=bibiFaceSVG("idle",44); },3000);
     if(sessionId){
       const {error:aErr} = await sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
@@ -3361,10 +3362,11 @@ function updateVoiceBtn(){
     btn.style.background="rgba(251,191,36,.35)";
     btn.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>`;
   } else {
-    btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
-    btn.innerHTML=voiceOn
-      ?`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
-      :`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>`;
+    btn.style.background = voiceOn ? "rgba(255,255,255,.15)" : "rgba(0,0,0,.25)";
+    btn.style.borderColor = voiceOn ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.2)";
+    btn.innerHTML = voiceOn
+      ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg><span style="color:white;font-size:11px;font-weight:700;margin-left:4px">Ses Açık</span>`
+      : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg><span style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;margin-left:4px">Ses Kapalı</span>`;
   }
   document.querySelectorAll(".msg-speak-btn").forEach(b=>{
     if(speechActive&&!speechPaused){b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="6" height="12" rx="1" fill="white"/><rect x="12" y="3" width="6" height="12" rx="1" fill="white"/></svg>';}
