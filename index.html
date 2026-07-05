@@ -153,7 +153,15 @@ function getAgeGroup(age){
   return "teen";
 }
 
-function floatingBubbles(children=[]){
+function floatingBubbles(children=[], theme={}){
+  const {
+    questionBg = "rgba(13,155,126,0.12)",
+    questionBorder = "rgba(13,155,126,0.25)",
+    questionColor = "rgba(13,155,126,0.7)",
+    chatBg = "rgba(255,255,255,0.10)",
+    chatBorder = "rgba(255,255,255,0.18)",
+    chatColor = "rgba(255,255,255,0.55)"
+  } = theme;
   // Get all unique age groups from children
   const groups = children.length > 0 
     ? [...new Set(children.map(c=>getAgeGroup(c.age)))]
@@ -191,9 +199,9 @@ function floatingBubbles(children=[]){
     const dur = 5+Math.random()*5;
     const delay = Math.random()*4;
     const isQ = b.type==="question";
-    const bg = isQ ? "rgba(13,155,126,0.12)" : "rgba(255,255,255,0.10)";
-    const border = isQ ? "1.5px solid rgba(13,155,126,0.25)" : "1.5px solid rgba(255,255,255,0.18)";
-    const textColor = isQ ? "rgba(13,155,126,0.7)" : "rgba(255,255,255,0.55)";
+    const bg = isQ ? questionBg : chatBg;
+    const border = isQ ? `1.5px solid ${questionBorder}` : `1.5px solid ${chatBorder}`;
+    const textColor = isQ ? questionColor : chatColor;
     html += `<div style="position:absolute;left:${pos.x}%;top:${pos.y}%;background:${bg};border:${border};border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;color:${textColor};white-space:nowrap;animation:${anim} ${dur}s ${delay}s ease-in-out infinite;pointer-events:none;max-width:200px;backdrop-filter:blur(4px)">${b.text}</div>`;
   });
   return html;
@@ -2069,7 +2077,14 @@ async function screenChildren(){
     sb.from("parents").select("full_name").eq("id",currentUser.id).single()
   ]);
   const parentDisplay = parentData?.full_name || currentUser?.email || "";
-  const bubblesBg = floatingBubbles(list||[]);
+      const bubblesBg = floatingBubbles(list||[], {
+        questionBg: "rgba(180,120,200,0.18)",
+        questionBorder: "rgba(180,120,200,0.35)",
+        questionColor: "rgba(120,60,160,0.75)",
+        chatBg: "rgba(100,180,220,0.15)",
+        chatBorder: "rgba(100,180,220,0.3)",
+        chatColor: "rgba(30,100,160,0.65)"
+      });
   const avatarColors=["#0D9B7E","#7C3AED","#F59E0B","#2563EB","#EC4899"];
 
   // Tüm çocuklar için proje davetlerini dinle
@@ -2082,7 +2097,7 @@ async function screenChildren(){
   checkPendingInvites(list||[]);
 
   render(`
-  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#e8f7f3 0%,#F8FBFA 60%,#f0e8ff 100%);position:relative;overflow:hidden">
+  <div style="min-height:100vh;width:100%;position:relative;overflow:hidden;background:linear-gradient(160deg, #fce4ec 0%, #f8bbd0 15%, #e1bee7 32%, #d1c4e9 48%, #bbdefb 64%, #b2ebf2 78%, #c8e6c9 90%, #dcedc8 100%);background-size:300% 300%;animation:gradShift 12s ease infinite">
     ${bubblesBg}
     <div style="position:relative;z-index:2;padding:0 0 60px;max-width:500px;margin:0 auto">
       <!-- Header — güvenli bölge -->
@@ -2097,12 +2112,12 @@ async function screenChildren(){
       </div>
 
       <div style="padding:0 20px">
-      <div style="font-size:12px;font-weight:800;color:#0D9B7E;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">Kim oynayacak?</div>
+      <div style="font-size:12px;font-weight:800;color:#9c4dcc;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px">Kim oynayacak?</div>
 
       <!-- Children list -->
       <div id="children-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px">
         ${list.map((c,i)=>`
-        <div onclick="startChat(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="background:white;border-radius:18px;padding:16px 18px;box-shadow:0 4px 20px rgba(0,0,0,.08);cursor:pointer;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease;transition:transform .15s,box-shadow .15s" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.14)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'">
+        <div onclick="startChat(${JSON.stringify(c).replace(/"/g,'&quot;')})" style="background:rgba(255,255,255,0.82);border-radius:18px;padding:16px 18px;box-shadow:0 4px 24px rgba(180,120,200,.12),0 1px 4px rgba(100,180,220,.08);cursor:pointer;display:flex;align-items:center;gap:14px;animation:fadeUp .3s ease;transition:transform .15s,box-shadow .15s;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7)" onmouseover="this.style.transform='translateY(-3px)';this.style.boxShadow='0 8px 28px rgba(0,0,0,.14)'" onmouseout="this.style.transform='';this.style.boxShadow='0 4px 20px rgba(0,0,0,.08)'">
           <div onclick="event.stopPropagation();openAvatarModal('${c.id}')" style="width:54px;height:54px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;color:white;font-weight:900;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.15);overflow:hidden;cursor:pointer;position:relative" title="Avatar değiştir">
           ${c.avatar_photo
             ? `<img src="${c.avatar_photo}" style="width:100%;height:100%;object-fit:cover"/>`
@@ -2128,7 +2143,7 @@ async function screenChildren(){
       </div>
 
       <!-- Add child -->
-      <div id="add-form" class="hidden" style="background:white;border-radius:18px;padding:22px 20px;box-shadow:0 4px 20px rgba(0,0,0,.08);margin-bottom:16px;animation:fadeUp .3s ease">
+      <div id="add-form" class="hidden" style="background:rgba(255,255,255,0.85);border-radius:18px;padding:22px 20px;box-shadow:0 4px 24px rgba(180,120,200,.12);margin-bottom:16px;animation:fadeUp .3s ease;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7)">
         <div style="font-size:16px;font-weight:800;color:#1A2E2A;margin-bottom:16px">Yeni Profil Ekle</div>
         <div style="display:flex;flex-direction:column;gap:10px">
 
