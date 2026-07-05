@@ -1308,7 +1308,7 @@ async function finishQuiz(){
   </div>`);
 }
 
-
+function buildPrompt(child, friendChild=null, projectType=null){
   const age = child.age || 9;
   const name = child.name || "sevgili";
   const gender = child.gender === "kız" ? "kız" : "erkek";
@@ -1401,7 +1401,7 @@ GÜVENLİK
 ━━━━━━━━━━━━━━━━━━━━━━━━
 • Kişisel bilgi sorma
 • Üzgün göründüğünde nazikçe yönlendir`;
-
+}
 
 // ══════════════════════════════════════════════════════════════
 // BACKGROUND THEME (by child gender & age)
