@@ -791,11 +791,11 @@ function startProject(myChild, friend, friendshipId){
   window._projectFriend = friend;
   window._projectFriendshipId = friendshipId;
 
-  const typeNames = {story:"Hikaye Yaz",experiment:"Deney Tasarla",quiz:"Bilgi Yarışması"};
-  const typeIcons = {story:"📖",experiment:"🔬",quiz:"🎯"};
-  const typeDescs = {story:"İki Bibi birlikte yaratıcı bir hikaye yazar",experiment:"İki Bibi birlikte bir fen deneyi tasarlar",quiz:"İki Bibi birlikte birbirine soru sorar"};
-  const typeBgs = {story:"rgba(124,58,237,.2)",experiment:"rgba(13,155,126,.15)",quiz:"rgba(245,158,11,.12)"};
-  const typeBorders = {story:"rgba(124,58,237,.4)",experiment:"rgba(13,155,126,.3)",quiz:"rgba(245,158,11,.3)"};
+  const types = [
+    {id:"homework", icon:"📚", name:"Birlikte Ödev Yap", desc:"İki Bibi birlikte ödev sorularını çözer", bg:"rgba(37,99,235,.2)", border:"rgba(37,99,235,.4)"},
+    {id:"experiment", icon:"🔬", name:"Birlikte Deney/Proje Yap", desc:"İki Bibi birlikte deney tasarlar ve araştırır", bg:"rgba(13,155,126,.15)", border:"rgba(13,155,126,.3)"},
+    {id:"quiz", icon:"🎯", name:"Bilgi Yarışması", desc:`5 dersten 5 soru · ${myChild.age<=8?"2":myChild.age<=12?"3":"4"} seçenek · Yaşına göre zorluk`, bg:"rgba(245,158,11,.12)", border:"rgba(245,158,11,.3)"},
+  ];
 
   render(`
   <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
@@ -804,19 +804,18 @@ function startProject(myChild, friend, friendshipId){
       <div style="text-align:center;margin-bottom:28px">
         <div style="font-size:36px;margin-bottom:8px">🚀</div>
         <div style="color:white;font-size:20px;font-weight:900">${myChild.name} & ${friend.name}</div>
-        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px">Hangi projeyi yapmak istiyorsun?</div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px;margin-top:4px">Hangi aktiviteyi yapmak istiyorsun?</div>
         <div style="color:rgba(255,255,255,.35);font-size:12px;margin-top:6px">${friend.name}'e bildirim gidecek ve onaylaması beklenecek</div>
       </div>
-
       <div style="display:flex;flex-direction:column;gap:12px">
-        ${Object.keys(typeNames).map(type=>`
-        <button onclick="sendProjectInvite('${type}')"
-          style="background:${typeBgs[type]};border:1.5px solid ${typeBorders[type]};border-radius:16px;padding:18px;cursor:pointer;text-align:left;transition:all .2s"
+        ${types.map(t=>`
+        <button onclick="sendProjectInvite('${t.id}')"
+          style="background:${t.bg};border:1.5px solid ${t.border};border-radius:16px;padding:18px;cursor:pointer;text-align:left;transition:all .2s;width:100%"
           onmouseover="this.style.transform='translateY(-2px)'"
           onmouseout="this.style.transform=''">
-          <div style="font-size:22px">${typeIcons[type]}</div>
-          <div style="color:white;font-size:15px;font-weight:800;margin-top:6px">${typeNames[type]}</div>
-          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">${typeDescs[type]}</div>
+          <div style="font-size:24px">${t.icon}</div>
+          <div style="color:white;font-size:15px;font-weight:800;margin-top:8px">${t.name}</div>
+          <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:3px">${t.desc}</div>
         </button>`).join("")}
       </div>
       <button onclick="screenFriends(window._projectChild)" style="width:100%;margin-top:16px;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-weight:700;cursor:pointer">← Geri</button>
@@ -937,13 +936,19 @@ function runProjectCurrent(projectType){
 }
 
 async function runProject(myChild, friend, projectType, friendshipId){
-  const typeNames = {story:"Hikaye",experiment:"Deney",quiz:"Bilgi Yarışması"};
+  const typeNames = {homework:"Birlikte Ödev",experiment:"Deney/Proje",quiz:"Bilgi Yarışması"};
+
+  // Quiz için ayrı ekran
+  if(projectType === "quiz"){
+    startQuizMode(myChild, friend, friendshipId);
+    return;
+  }
 
   render(`
   <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#243d38);display:flex;flex-direction:column">
     <div style="background:rgba(255,255,255,.06);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px)">
       <div>
-        <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px">İş Birliği Projesi</div>
+        <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px">İş Birliği</div>
         <div style="color:white;font-size:16px;font-weight:900">${typeNames[projectType]||"Proje"} — ${myChild.name} & ${friend.name}</div>
       </div>
       <button onclick="screenChildren()" style="background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:20px;padding:7px 14px;color:white;font-size:12px;font-weight:700;cursor:pointer">✕ Çık</button>
@@ -1045,9 +1050,265 @@ function sendProjectMsg(){
   sendProjectAI(text);
 }
 
+// ══════════════════════════════════════════════════════════════
+// BİLGİ YARIŞMASI SİSTEMİ
+// ══════════════════════════════════════════════════════════════
+const QUIZ_SUBJECTS = ["Türkçe","Matematik","Fen Bilimleri","Sosyal Bilgiler","İngilizce"];
+const SUBJECT_ICONS = {"Türkçe":"📝","Matematik":"📐","Fen Bilimleri":"🔬","Sosyal Bilgiler":"🌍","İngilizce":"🇬🇧"};
+
+let quizState = null; // {questions, currentQ, answers, child, friend, friendshipId, quizSessionId}
+
+async function startQuizMode(myChild, friend, friendshipId){
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#0f2535);display:flex;align-items:center;justify-content:center;padding:20px;position:relative;overflow:hidden">
+    ${floatingBibis(3,["#F59E0B","#0D9B7E"])}
+    <div style="position:relative;z-index:2;text-align:center;animation:fadeUp .4s ease">
+      <div style="font-size:52px;margin-bottom:16px;animation:bounce 1.5s ease-in-out infinite">🎯</div>
+      <div style="color:white;font-size:22px;font-weight:900;margin-bottom:8px">Bilgi Yarışması</div>
+      <div style="color:rgba(255,255,255,.5);font-size:14px;margin-bottom:8px">${myChild.name} vs ${friend.name}</div>
+      <div style="color:rgba(255,255,255,.35);font-size:12px;margin-bottom:28px">5 ders · 5 soru · Yaşına göre zorluk</div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:28px">
+        ${QUIZ_SUBJECTS.map(s=>`<div style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;font-size:12px;color:rgba(255,255,255,.6);font-weight:600">${SUBJECT_ICONS[s]} ${s}</div>`).join("")}
+      </div>
+      <div id="quiz-loading-msg" style="color:rgba(255,255,255,.4);font-size:13px;margin-bottom:20px">Sorular hazırlanıyor...</div>
+      <div style="display:flex;gap:6px;justify-content:center">
+        ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#F59E0B;animation:dotPulse 1.2s ease ${i*.2}s infinite"></div>`).join("")}
+      </div>
+    </div>
+  </div>`);
+
+  // AI ile 5 soru üret
+  const questions = await generateQuizQuestions(myChild);
+  if(!questions){ alert("Sorular üretilemedi, tekrar dene."); screenFriends(myChild); return; }
+
+  // Quiz session kaydet
+  const {data:proj} = await sb.from("projects").insert({
+    friendship_id: friendshipId,
+    type:"quiz",
+    title:`Bilgi Yarışması — ${new Date().toLocaleDateString("tr-TR")}`
+  }).select().single();
+
+  const {data:qs} = await sb.from("quiz_sessions").insert({
+    project_id: proj?.id,
+    child_id: myChild.id,
+    questions: questions,
+    answers: [],
+    scores: {}
+  }).select().single();
+
+  quizState = {
+    questions, currentQ: 0, answers: [],
+    child: myChild, friend, friendshipId,
+    quizSessionId: qs?.id, projectId: proj?.id
+  };
+
+  showQuizQuestion();
+}
+
+async function generateQuizQuestions(child){
+  const age = child.age||9;
+  const optCount = age<=8 ? 2 : age<=12 ? 3 : 4;
+
+  const difficulty = age<=8
+    ? "çok basit, somut, günlük hayat örnekleriyle, 1. ve 2. sınıf düzeyinde"
+    : age<=12
+    ? "orta zorlukta, okul müfredatına uygun, 3-6. sınıf düzeyinde"
+    : "biraz zorlayıcı, analitik düşünme gerektiren, 7-9. sınıf düzeyinde";
+
+  const prompt = `${age} yaşında bir çocuk için Türkçe bilgi yarışması soruları üret.
+Zorluk seviyesi: ${difficulty}
+Her dersten 1 soru olmak üzere tam 5 soru üret: Türkçe, Matematik, Fen Bilimleri, Sosyal Bilgiler, İngilizce
+Her soru için ${optCount} şık olsun. Şıklar A, B${optCount>=3?", C":""}${optCount>=4?", D":""} şeklinde olsun.
+SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
+{
+  "questions": [
+    {
+      "subject": "Türkçe",
+      "question": "soru metni",
+      "options": ["A) ...", "B) ..."${optCount>=3?', "C) ..."':""}${optCount>=4?', "D) ..."':""}],
+      "correct": "A",
+      "explanation": "kısa açıklama"
+    }
+  ]
+}`;
+
+  try{
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
+      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:prompt}],max_tokens:2000})
+    });
+    const data = await res.json();
+    let text = data.choices?.[0]?.message?.content||"";
+    text = text.replace(/```json|```/g,"").trim();
+    const parsed = JSON.parse(text);
+    return parsed.questions;
+  }catch(e){
+    console.error("Quiz soru üretme hatası:",e);
+    return null;
+  }
+}
+
+function showQuizQuestion(){
+  const {questions, currentQ, child} = quizState;
+  if(currentQ >= questions.length){ finishQuiz(); return; }
+
+  const q = questions[currentQ];
+  const age = child.age||9;
+  const subjectColors = {"Türkçe":"#2563EB","Matematik":"#0D9B7E","Fen Bilimleri":"#7C3AED","Sosyal Bilgiler":"#F59E0B","İngilizce":"#EC4899"};
+  const color = subjectColors[q.subject]||"#0D9B7E";
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#0f2535);display:flex;flex-direction:column;padding:0">
+    <!-- Header -->
+    <div style="background:rgba(255,255,255,.05);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;backdrop-filter:blur(12px)">
+      <div style="color:rgba(255,255,255,.5);font-size:12px;font-weight:700">${child.name}'in Bilgi Yarışması</div>
+      <button onclick="if(confirm('Yarışmadan çıkmak istediğine emin misin?')) screenChildren()" style="background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:16px;padding:6px 12px;color:rgba(255,255,255,.6);font-size:12px;font-weight:700;cursor:pointer">✕ Çık</button>
+    </div>
+
+    <!-- Progress -->
+    <div style="padding:16px 20px 0">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        ${questions.map((_,i)=>`<div style="flex:1;height:4px;border-radius:4px;background:${i<currentQ?"#4ade80":i===currentQ?color:"rgba(255,255,255,.15)"}"></div>`).join("")}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="color:rgba(255,255,255,.4);font-size:12px">Soru ${currentQ+1} / ${questions.length}</div>
+        <div style="background:${color}22;border:1px solid ${color}44;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;color:${color}">${SUBJECT_ICONS[q.subject]||""} ${q.subject}</div>
+      </div>
+    </div>
+
+    <!-- Question -->
+    <div style="flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center">
+      <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;padding:24px;margin-bottom:20px">
+        <div style="color:white;font-size:17px;font-weight:700;line-height:1.5">${q.question}</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px" id="options-container">
+        ${q.options.map((opt,i)=>{
+          const letter = String.fromCharCode(65+i);
+          return `<button onclick="selectAnswer('${letter}')" id="opt-${letter}"
+            style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.12);border-radius:14px;padding:14px 18px;text-align:left;color:white;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px"
+            onmouseover="this.style.background='rgba(255,255,255,.12)';this.style.borderColor='rgba(255,255,255,.3)'"
+            onmouseout="this.style.background='rgba(255,255,255,.06)';this.style.borderColor='rgba(255,255,255,.12)'">
+            <span style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">${letter}</span>
+            <span>${opt.replace(/^[A-D]\)\s*/,"")}</span>
+          </button>`;
+        }).join("")}
+      </div>
+    </div>
+  </div>`);
+}
+
+async function selectAnswer(letter){
+  const {questions, currentQ, answers, child} = quizState;
+  const q = questions[currentQ];
+  const isCorrect = letter === q.correct;
+
+  // Seçilen şıkkı renklendir
+  document.querySelectorAll("[id^='opt-']").forEach(btn=>{
+    btn.style.pointerEvents = "none";
+    btn.onmouseover = null; btn.onmouseout = null;
+  });
+
+  const selectedBtn = document.getElementById(`opt-${letter}`);
+  const correctBtn = document.getElementById(`opt-${q.correct}`);
+  if(selectedBtn) selectedBtn.style.background = isCorrect ? "rgba(74,222,128,.25)" : "rgba(244,132,95,.25)";
+  if(selectedBtn) selectedBtn.style.borderColor = isCorrect ? "#4ade80" : "#F4845F";
+  if(!isCorrect && correctBtn){ correctBtn.style.background="rgba(74,222,128,.15)"; correctBtn.style.borderColor="#4ade80"; }
+
+  // Açıklama göster
+  const container = document.getElementById("options-container");
+  if(container){
+    const expDiv = document.createElement("div");
+    expDiv.style.cssText = `margin-top:14px;padding:12px 16px;border-radius:12px;background:${isCorrect?"rgba(74,222,128,.1)":"rgba(244,132,95,.1)"};border:1px solid ${isCorrect?"rgba(74,222,128,.3)":"rgba(244,132,95,.3)"};color:${isCorrect?"#4ade80":"#fca88a"};font-size:13px;font-weight:600`;
+    expDiv.innerHTML = `${isCorrect?"✅ Harika! ":"❌ Doğrusu ${q.correct}. "} ${q.explanation||""}`;
+    container.appendChild(expDiv);
+
+    // Devam butonu
+    const nextBtn = document.createElement("button");
+    nextBtn.style.cssText = "margin-top:12px;width:100%;padding:13px;border-radius:14px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:15px;cursor:pointer";
+    nextBtn.textContent = currentQ+1 < questions.length ? "Sonraki Soru →" : "Sonuçları Gör 🏆";
+    nextBtn.onclick = ()=>{
+      quizState.answers.push({subject:q.subject, correct:isCorrect, answer:letter, correctAnswer:q.correct});
+      quizState.currentQ++;
+      showQuizQuestion();
+    };
+    container.appendChild(nextBtn);
+  }
+}
+
+async function finishQuiz(){
+  const {answers, child, quizSessionId, friend} = quizState;
+  const correct = answers.filter(a=>a.correct).length;
+  const total = answers.length;
+
+  // Scores hesapla — ders bazlı
+  const scores = {};
+  answers.forEach(a=>{ scores[a.subject]=a.correct; });
+
+  // Supabase'e kaydet
+  if(quizSessionId){
+    await sb.from("quiz_sessions").update({
+      answers, scores, total_score:correct, completed:true
+    }).eq("id",quizSessionId);
+  }
+
+  // Mastery güncelle — doğru yapılan dersler
+  const subjectToTopic = {"Matematik":"Matematik","Fen Bilimleri":"Fen","Türkçe":"Dil","İngilizce":"Dil","Sosyal Bilgiler":"Tarih"};
+  for(const a of answers){
+    if(a.correct && subjectToTopic[a.subject]){
+      await updateMastery(child.id, subjectToTopic[a.subject]);
+    }
+  }
+
+  const subjectColors = {"Türkçe":"#2563EB","Matematik":"#0D9B7E","Fen Bilimleri":"#7C3AED","Sosyal Bilgiler":"#F59E0B","İngilizce":"#EC4899"};
+  const stars = correct>=4?"🌟🌟🌟":correct>=3?"🌟🌟":correct>=2?"🌟":"💪";
+
+  render(`
+  <div style="min-height:100vh;background:linear-gradient(135deg,#1A2E2A,#0f2535);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden">
+    ${floatingBibis(4,["#F59E0B","#0D9B7E"])}
+    <div style="position:relative;z-index:2;width:100%;max-width:400px;animation:fadeUp .4s ease">
+
+      <!-- Sonuç başlığı -->
+      <div style="text-align:center;margin-bottom:24px">
+        <div style="font-size:48px;margin-bottom:12px">${stars}</div>
+        <div style="color:white;font-size:24px;font-weight:900">${child.name}, tebrikler!</div>
+        <div style="color:rgba(255,255,255,.5);font-size:15px;margin-top:6px">${total} sorudan <span style="color:#4ade80;font-weight:800">${correct}</span> doğru yaptın</div>
+      </div>
+
+      <!-- Ders bazlı sonuçlar -->
+      <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:20px;padding:20px;margin-bottom:16px">
+        <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:14px">Ders Bazlı Sonuçların</div>
+        ${answers.map(a=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:16px">${SUBJECT_ICONS[a.subject]||"📚"}</span>
+            <span style="color:white;font-size:14px;font-weight:700">${a.subject}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:18px">${a.correct?"✅":"❌"}</span>
+            <span style="font-size:12px;font-weight:700;color:${a.correct?"#4ade80":"rgba(255,255,255,.3)"}">${a.correct?"Doğru":"Yanlış"}</span>
+          </div>
+        </div>`).join("")}
+      </div>
+
+      <!-- Bibi yorumu -->
+      <div style="background:rgba(13,155,126,.1);border:1.5px solid rgba(13,155,126,.2);border-radius:16px;padding:14px 16px;margin-bottom:20px">
+        <div style="color:#4ade80;font-size:13px;font-weight:700;margin-bottom:6px">🤖 Bibi'nin Yorumu</div>
+        <div style="color:rgba(255,255,255,.7);font-size:13px;line-height:1.6">
+          ${correct===5?"Mükemmel! Tüm soruları doğru yaptın, harikasın! 🌟":
+            correct>=3?`${answers.filter(a=>a.correct).map(a=>a.subject).join(", ")} konularında çok güçlüsün! ${answers.filter(a=>!a.correct).map(a=>a.subject).join(", ")} konularında biraz daha çalışabiliriz.`:
+            `${answers.filter(a=>a.correct).map(a=>a.subject).join(", ")} konularında iyi bir başlangıç yaptın. Devam et! 💪`}
+        </div>
+      </div>
+
+      <button onclick="screenChildren()" style="width:100%;padding:14px;border-radius:14px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:16px;cursor:pointer">Ana Sayfaya Dön 🏠</button>
+      <button onclick="startQuizMode(quizState.child,quizState.friend,quizState.friendshipId)" style="width:100%;margin-top:10px;padding:12px;border-radius:14px;border:1.5px solid rgba(255,255,255,.2);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">Tekrar Oyna 🔄</button>
+    </div>
+  </div>`);
+}
 
 
-function buildPrompt(child, friendChild=null, projectType=null){
   const age = child.age || 9;
   const name = child.name || "sevgili";
   const gender = child.gender === "kız" ? "kız" : "erkek";
@@ -1140,7 +1401,6 @@ GÜVENLİK
 ━━━━━━━━━━━━━━━━━━━━━━━━
 • Kişisel bilgi sorma
 • Üzgün göründüğünde nazikçe yönlendir`;
-}
 
 
 // ══════════════════════════════════════════════════════════════
