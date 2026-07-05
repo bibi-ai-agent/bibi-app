@@ -1072,7 +1072,135 @@ function sendProjectMsg(){
 }
 
 // ══════════════════════════════════════════════════════════════
-// BİLGİ YARIŞMASI SİSTEMİ
+// DUYGU & İLGİ ANALİZİ
+// ══════════════════════════════════════════════════════════════
+
+// Her 5 mesajda bir analiz yap (her mesajda yapmak çok fazla API çağrısı)
+let emotionMsgCounter = 0;
+
+async function analyzeEmotionAndInterest(childId, sessionId, text){
+  emotionMsgCounter++;
+  if(emotionMsgCounter % 5 !== 0) return; // Her 5 mesajda bir
+
+  // Son 5 mesajı al
+  const recentMsgs = messages.slice(-10).map(m=>m.t).join("\n");
+
+  const prompt = `Aşağıdaki çocuk mesajlarını analiz et ve JSON formatında yanıt ver.
+Çocuğun yaşı: ${currentChild?.age||9}
+
+Mesajlar:
+${recentMsgs}
+
+Şunları belirle:
+1. emotion: Baskın duygu (sadece biri seç: happy/excited/curious/calm/sad/frustrated/bored/anxious)
+2. interest_area: Baskın ilgi alanı (sadece biri seç: sanat/spor/bilim/müzik/oyun/doğa/sosyal/teknoloji/edebiyat/matematik/genel)
+3. confidence: Bu etiketlere güven skoru 0-100
+4. character_hint: Kısa karakter gözlemi (max 20 kelime Türkçe)
+5. engagement: Yüksek/Orta/Düşük (konuşmaya katılım seviyesi)
+
+SADECE JSON yanıt ver:
+{"emotion":"...","interest_area":"...","confidence":85,"character_hint":"...","engagement":"..."}`;
+
+  try{
+    const res = await fetch(OPENROUTER_URL,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app"},
+      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:prompt}],max_tokens:200})
+    });
+    const data = await res.json();
+    let raw = data.choices?.[0]?.message?.content||"{}";
+    raw = raw.replace(/```json|```/g,"").trim();
+    const parsed = JSON.parse(raw);
+
+    await sb.from("emotion_logs").insert({
+      child_id: childId,
+      session_id: sessionId,
+      emotion: parsed.emotion||"calm",
+      interest_area: parsed.interest_area||"genel",
+      confidence: parsed.confidence||50,
+      character_hint: parsed.character_hint||null,
+      engagement: parsed.engagement||"Orta"
+    });
+  }catch(e){
+    console.log("Duygu analizi sessizce atlandı:", e.message);
+  }
+}
+
+// Haftalık rapor üret (manuel tetiklenir)
+async function generateWeeklyReport(child){
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - 7);
+
+  const [{data:emotions=[]},{data:sessions=[]},{data:quizSessions=[]}] = await Promise.all([
+    sb.from("emotion_logs").select("*").eq("child_id",child.id).gte("created_at",weekStart.toISOString()),
+    sb.from("sessions").select("*").eq("child_id",child.id).gte("started_at",weekStart.toISOString()),
+    sb.from("quiz_sessions").select("*").eq("child_id",child.id).eq("completed",true).gte("created_at",weekStart.toISOString())
+  ]);
+
+  const {data:msgs=[]} = await sb.from("messages")
+    .select("content,role,created_at")
+    .eq("child_id",child.id)
+    .eq("role","user")
+    .gte("created_at",weekStart.toISOString())
+    .limit(50);
+
+  // Duygu dağılımı
+  const emotionCounts = {};
+  const interestCounts = {};
+  emotions.forEach(e=>{
+    emotionCounts[e.emotion]=(emotionCounts[e.emotion]||0)+1;
+    interestCounts[e.interest_area]=(interestCounts[e.interest_area]||0)+1;
+  });
+
+  const dominantEmotion = Object.entries(emotionCounts).sort((a,b)=>b[1]-a[1])[0]?.[0]||"calm";
+  const topInterests = Object.entries(interestCounts).sort((a,b)=>b[1]-a[1]).slice(0,3).map(e=>e[0]);
+
+  // Quiz sonuçları
+  const quizResults = quizSessions.map(q=>q.scores||{});
+
+  const reportPrompt = `Sen bir çocuk psikoloji uzmanısın. Aşağıdaki verilere göre ${child.age} yaşındaki ${child.name} için haftalık gelişim raporu yaz.
+
+VERİLER:
+- Toplam oturum: ${sessions.length}
+- Toplam konuşma dakikası: ${sessions.reduce((s,x)=>s+(x.duration_mins||0),0)}
+- Baskın duygu bu hafta: ${dominantEmotion}
+- Duygu dağılımı: ${JSON.stringify(emotionCounts)}
+- İlgi alanları: ${JSON.stringify(interestCounts)}
+- Çocuğun mesajlarından örnekler: ${msgs.slice(0,10).map(m=>m.content).join(" | ")}
+- Karakter gözlemleri: ${emotions.map(e=>e.character_hint).filter(Boolean).join(", ")}
+- Quiz sonuçları: ${JSON.stringify(quizResults)}
+
+Raporu şu başlıklar altında yaz (Türkçe, veliye hitap ederek, samimi ve destekleyici bir dille):
+1. 💙 Duygusal Durum (2-3 cümle)
+2. ⭐ İlgi Alanları & Güçlü Yönler (2-3 cümle)
+3. 🌱 Karakter Gözlemleri (2-3 cümle)
+4. ⚠️ Dikkat Edilmesi Gerekenler (varsa, 1-2 cümle — yoksa "Bu hafta endişe verici bir durum gözlemlenmedi" yaz)
+5. 💡 Ebeveyn Önerileri (2-3 pratik öneri)
+
+ÖNEMLİ: Hiçbir zaman "kazandı/kaybetti" veya başka çocuklarla kıyaslama yapma. Sadece ${child.name}'in kendine özgü gelişimini anlat.`;
+
+  const res = await fetch(OPENROUTER_URL,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app"},
+    body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:reportPrompt}],max_tokens:1500})
+  });
+  const data = await res.json();
+  const summary = data.choices?.[0]?.message?.content||"Rapor üretilemedi.";
+
+  // Kaydet
+  await sb.from("weekly_reports").upsert({
+    child_id:child.id,
+    week_start:weekStart.toISOString().split("T")[0],
+    summary,
+    dominant_emotion:dominantEmotion,
+    top_interests:topInterests,
+    character_notes:emotions.map(e=>e.character_hint).filter(Boolean).join("; ")
+  });
+
+  return {summary, dominantEmotion, topInterests, emotionCounts, interestCounts};
+}
+
+
 // ══════════════════════════════════════════════════════════════
 const QUIZ_SUBJECTS = ["Türkçe","Matematik","Fen Bilimleri","Sosyal Bilgiler","İngilizce"];
 const SUBJECT_ICONS = {"Türkçe":"📝","Matematik":"📐","Fen Bilimleri":"🔬","Sosyal Bilgiler":"🌍","İngilizce":"🇬🇧"};
@@ -1977,111 +2105,13 @@ async function checkPin(){
 
 // ── Gelişim Raporu (Ebeveyn Paneli) ───────────────────────────
 const TOPIC_ICONS = {"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
-const TOPIC_COLORS = {"Matematik":"#2563EB","Fen":"#16A34A","Dil":"#9333EA","Tarih":"#EA580C","Genel":"#6B7280"};
-
-async function screenReport(child){
-  if(typeof child==="string") child=JSON.parse(child);
-  render(`<div style="min-height:100vh;width:100%;background:#F8FBFA;display:flex;align-items:center;justify-content:center">
-    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
-      ${bibiFaceSVG("thinking",70)}
-      <div style="color:#6B7280;font-size:14px;font-weight:600">Rapor hazırlanıyor...</div>
-    </div>
-  </div>`);
-
-  const [{data:mastery=[]},{data:sessions=[]}] = await Promise.all([
-    sb.from("mastery").select("*").eq("child_id",child.id).order("score",{ascending:false}),
-    sb.from("sessions").select("*").eq("child_id",child.id).order("started_at",{ascending:false}).limit(10)
-  ]);
-
-  const totalMinutes = sessions.reduce((s,x)=>s+(x.duration_mins||0),0);
-  const totalMessages = sessions.reduce((s,x)=>s+(x.message_count||0),0);
-  const avgScore = mastery.length ? Math.round(mastery.reduce((s,m)=>s+m.score,0)/mastery.length) : 0;
-  const topTopic = mastery[0]?.topic || "Henüz yok";
-
-  render(`
-  <div style="min-height:100vh;width:100%;background:linear-gradient(135deg,#f0f7f5 0%,#F8FBFA 100%)">
-    <!-- Header -->
-    <div style="background:linear-gradient(135deg,#1A2E2A,#243d38);padding:20px 20px 26px;position:sticky;top:0;z-index:10">
-      <div style="max-width:480px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
-        <div>
-          <div style="color:rgba(255,255,255,.55);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Gelişim Raporu</div>
-          <div style="color:white;font-size:21px;font-weight:900;margin-top:2px">${child.name} ${child.gender==="kız"?"👧":"👦"}</div>
-        </div>
-        <button onclick="screenChildren()" style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);border-radius:20px;padding:8px 16px;color:white;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Geri
-        </button>
-      </div>
-    </div>
-
-    <div style="max-width:480px;margin:0 auto;padding:20px 16px 50px">
-      <!-- Stat cards -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">
-        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-          <div style="font-size:20px">⏱️</div>
-          <div style="font-size:21px;font-weight:900;color:#2563EB;margin-top:4px">${totalMinutes}</div>
-          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Dakika</div>
-        </div>
-        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-          <div style="font-size:20px">💬</div>
-          <div style="font-size:21px;font-weight:900;color:#0D9B7E;margin-top:4px">${totalMessages}</div>
-          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Mesaj</div>
-        </div>
-        <div style="background:white;border-radius:16px;padding:14px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-          <div style="font-size:20px">🎯</div>
-          <div style="font-size:21px;font-weight:900;color:#7C3AED;margin-top:4px">%${avgScore}</div>
-          <div style="font-size:10px;color:#9CA3AF;font-weight:700;margin-top:2px">Ort. Ustalık</div>
-        </div>
-      </div>
-
-      <!-- Top topic highlight -->
-      ${mastery.length ? `
-      <div style="background:white;border-radius:16px;padding:16px 18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px">
-        <div style="width:46px;height:46px;border-radius:12px;background:${TOPIC_COLORS[topTopic]||'#6B7280'}22;display:flex;align-items:center;justify-content:center;font-size:22px">${TOPIC_ICONS[topTopic]||'🌍'}</div>
-        <div>
-          <div style="font-size:11px;color:#9CA3AF;font-weight:700;text-transform:uppercase;letter-spacing:1px">En güçlü konu</div>
-          <div style="font-size:17px;font-weight:800;color:#1A2E2A;margin-top:2px">${topTopic}</div>
-        </div>
-      </div>` : ''}
-
-      <!-- Mastery bars -->
-      <div style="background:white;border-radius:16px;padding:20px 18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:16px">📊 Konu Bazlı Ustalık</div>
-        ${mastery.length === 0 ? `
-        <div style="text-align:center;color:#9CA3AF;font-size:13px;padding:24px 0">
-          Henüz veri yok.<br/>${child.name} Bibi ile konuştukça burada gelişimi görünecek 🌱
-        </div>` : mastery.map(m => `
-        <div style="margin-bottom:14px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:5px;align-items:center">
-            <span style="font-size:13px;font-weight:700;color:#1A2E2A;display:flex;align-items:center;gap:6px">${TOPIC_ICONS[m.topic]||'🌍'} ${m.topic}</span>
-            <span style="font-size:12px;color:${TOPIC_COLORS[m.topic]||'#6B7280'};font-weight:800">%${m.score}</span>
-          </div>
-          <div style="height:8px;background:#f3f4f6;border-radius:8px;overflow:hidden">
-            <div style="height:100%;width:${m.score}%;background:${TOPIC_COLORS[m.topic]||'#6B7280'};border-radius:8px;transition:width .6s ease"></div>
-          </div>
-          <div style="font-size:11px;color:#9CA3AF;margin-top:3px">${m.message_count} etkileşim</div>
-        </div>`).join("")}
-      </div>
-
-      <!-- Recent sessions -->
-      <div style="background:white;border-radius:16px;padding:20px 18px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:14px">🕐 Son Oturumlar</div>
-        ${sessions.length === 0 ? `
-        <div style="text-align:center;color:#9CA3AF;font-size:13px;padding:16px 0">Henüz oturum yok</div>` :
-        sessions.slice(0,5).map(s => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f3f4f6">
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#1A2E2A">${new Date(s.started_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}</div>
-            <div style="font-size:11px;color:#9CA3AF;margin-top:2px">${new Date(s.started_at).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}</div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:13px;font-weight:700;color:#0D9B7E">${s.duration_mins||0} dk</div>
-            <div style="font-size:11px;color:#9CA3AF;margin-top:2px">${s.message_count||0} mesaj</div>
-          </div>
-        </div>`).join("")}
-      </div>
-    </div>
-  </div>`);
+async function generateAndShowReport(childId){
+  const btn = document.getElementById("gen-report-btn");
+  if(btn){ btn.textContent="⏳ Hazırlanıyor..."; btn.disabled=true; }
+  const {data:child} = await sb.from("children").select("*").eq("id",childId).single();
+  if(!child) return;
+  await generateWeeklyReport(child);
+  screenReport(child);
 }
 
 async function screenChildren(){
@@ -2721,6 +2751,8 @@ async function sendMessage(){
     console.warn("sessionId yok, mesaj kaydedilemiyor");
   }
   updateMastery(currentChild.id, topic);
+  // Duygu ve ilgi analizi — arka planda çalışır
+  analyzeEmotionAndInterest(currentChild.id, sessionId, text);
   try{
     const res=await fetch(OPENROUTER_URL,{
       method:"POST",
