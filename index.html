@@ -335,6 +335,64 @@ async function createInviteCode(childId){
 }
 
 // ── Arkadaş Ekle Ekranı ───────────────────────────────────────
+// ── Presence (online/offline durumu) ─────────────────────────
+let presenceChannel = null;
+
+function startPresence(children){
+  if(presenceChannel){ sb.removeChannel(presenceChannel); presenceChannel=null; }
+  if(!children||children.length===0) return;
+
+  presenceChannel = sb.channel('bibi-presence', {
+    config: { presence: { key: currentUser.id } }
+  });
+
+  presenceChannel
+    .on('presence', { event: 'sync' }, () => {
+      const state = presenceChannel.presenceState();
+      updatePresenceUI(state, children);
+    })
+    .on('presence', { event: 'join' }, ({ newPresences }) => {
+      const state = presenceChannel.presenceState();
+      updatePresenceUI(state, children);
+    })
+    .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+      const state = presenceChannel.presenceState();
+      updatePresenceUI(state, children);
+    })
+    .subscribe(async (status) => {
+      if(status === 'SUBSCRIBED'){
+        // Tüm çocuk ID'lerini online olarak gönder
+        await presenceChannel.track({
+          user_id: currentUser.id,
+          child_ids: children.map(c=>c.id),
+          online_at: new Date().toISOString()
+        });
+      }
+    });
+}
+
+function updatePresenceUI(state, myChildren){
+  // Online olan tüm child_id'leri topla
+  const onlineChildIds = new Set();
+  Object.values(state).forEach(presences => {
+    presences.forEach(p => {
+      if(p.child_ids) p.child_ids.forEach(id => onlineChildIds.add(id));
+    });
+  });
+
+  // Kendi çocuklarımızı dahil etme (zaten online görünmesin)
+  const myChildIds = new Set(myChildren.map(c=>c.id));
+
+  // UI'daki presence dot'larını güncelle
+  document.querySelectorAll('[id^="presence-"]').forEach(dot => {
+    const childId = dot.id.replace('presence-','');
+    if(myChildIds.has(childId)) return; // kendi çocukları sayma
+    const isOnline = onlineChildIds.has(childId);
+    dot.style.background = isOnline ? '#4ade80' : '#6B7280';
+    dot.title = isOnline ? 'Online' : 'Offline';
+  });
+}
+
 // ── Bekleyen davetleri kontrol et (uygulama açılınca) ────────
 async function checkPendingInvites(children){
   const childIds = children.map(c=>c.id);
@@ -693,7 +751,10 @@ async function loadFriends(child){
       : f.gender==="kız" ? "👧" : "👦";
     return `
     <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s ease">
-      <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden">${avatarHtml}</div>
+      <div style="position:relative;flex-shrink:0">
+        <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden">${avatarHtml}</div>
+        <div id="presence-${f.id}" style="position:absolute;bottom:1px;right:1px;width:12px;height:12px;border-radius:50%;background:#6B7280;border:2px solid #1A2E2A;transition:background .3s"></div>
+      </div>
       <div style="flex:1">
         <div style="color:white;font-size:15px;font-weight:800">${f.name}</div>
         <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${f.age} yaş ${f.bibi_specialty?`· ${specialtyIcons[f.bibi_specialty]||"⭐"} ${f.bibi_specialty} Uzmanı`:""}</div>
@@ -1740,6 +1801,9 @@ async function screenChildren(){
 
   // Tüm çocuklar için proje davetlerini dinle
   startGlobalInviteListener(list||[]);
+
+  // Presence — tüm çocukları online olarak işaretle
+  startPresence(list||[]);
 
   // Bekleyen davetleri kontrol et (uygulama açılınca)
   checkPendingInvites(list||[]);
