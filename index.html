@@ -73,6 +73,19 @@
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
+const ELEVENLABS_KEY = "sk_41588dc49a5f53e0da60804f8b4565d5efa63c883ef2853c";
+
+// ElevenLabs sesleri — 2 kadın, 2 erkek
+const ELEVENLABS_VOICES = [
+  { id:"EXAVITQu4vr4xnSDxMaL", name:"Sarah",   label:"Kadın — Sıcak & Doğal",   gender:"female" },
+  { id:"XB0fDUnXU5powFXDhCwa", name:"Charlotte", label:"Kadın — Tatlı & Genç",  gender:"female" },
+  { id:"TX3LPaxmHKxFdv7VOQHJ", name:"Liam",     label:"Erkek — Güvenilir & Net", gender:"male"   },
+  { id:"pFZP5JQG7iQjIQuC4Bku", name:"Lily",     label:"Erkek — Derin & Sakin",   gender:"male"   },
+];
+
+// Seçili ses — varsayılan ilk kadın sesi
+let selectedVoiceId = ELEVENLABS_VOICES[0].id;
+let elevenLabsEnabled = true; // false ise tarayıcı sesine düşer
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
@@ -2503,6 +2516,9 @@ async function startChat(child){
       <button onclick="toggleVoice()" id="voice-btn" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.2);border:1.5px solid rgba(255,255,255,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
       </button>
+      <button onclick="showVoiceSelector()" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="Ses Seç">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3" stroke="white" stroke-width="2"/><path d="M6 20v-2a6 6 0 0 1 12 0v2" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
     </div>
 
     <!-- Sohbet Geçmişi Panel (sol taraftan kayar) -->
@@ -2938,12 +2954,13 @@ async function goBack(){
 }
 
 // ── VOICE ─────────────────────────────────────────────────────
-// ── Ses sistemi (boundary tabanlı durdur/devam) ───────────────
-let speechWords = [];        // Tüm kelimeler
-let speechWordIndex = 0;     // Durdurulduğundaki kelime pozisyonu
+// ── Ses sistemi (ElevenLabs TTS) ─────────────────────────────
+let speechWords = [];
+let speechWordIndex = 0;
 let speechPaused = false;
 let speechActive = false;
 let speechCurrentText = "";
+let currentAudio = null; // ElevenLabs audio element
 
 function cleanText(text){
   return text
@@ -2954,152 +2971,192 @@ function cleanText(text){
     .replace(/[★☆♥♦♣♠•◦▪▫►◄▲▼]/g,"")
     .replace(/━+/g," ").replace(/\s+/g," ").trim();
 }
-function getVoiceSettings(){
-  const age = currentChild?.age || 9;
-  if(age<=8)  return {rate:0.82,pitch:1.45};
-  if(age<=12) return {rate:0.88,pitch:1.20};
-  return              {rate:0.92,pitch:1.05};
+
+async function speak(text){
+  if(!voiceOn) return;
+  if(currentAudio){ currentAudio.pause(); currentAudio=null; }
+  window.speechSynthesis?.cancel();
+  speechPaused=false; speechActive=false;
+  const clean=cleanText(text); if(!clean) return;
+  speechCurrentText=clean;
+  speechWords=clean.split(/\s+/).filter(Boolean);
+  speechWordIndex=0;
+
+  if(elevenLabsEnabled){
+    await speakElevenLabs(clean);
+  } else {
+    speakBrowser(clean);
+  }
 }
-function getTRVoice(){
-  const vs = window.speechSynthesis.getVoices();
-  return vs.find(v=>v.lang.startsWith("tr")&&(v.name.includes("Filiz")||v.name.includes("Yelda")))
-    || vs.find(v=>v.lang.startsWith("tr")) || null;
-}
 
-function startSpeechFrom(wordIndex){
-  window.speechSynthesis.cancel();
-  if(wordIndex >= speechWords.length){ speechActive=false; speechPaused=false; onSpeechEnd(); return; }
-
-  const remaining = speechWords.slice(wordIndex).join(" ");
-  const u = new SpeechSynthesisUtterance(remaining);
-  u.lang = "tr-TR";
-  const vs = getVoiceSettings();
-  u.rate = vs.rate; u.pitch = vs.pitch; u.volume = 1.0;
-  const tv = getTRVoice(); if(tv) u.voice = tv;
-
-  // boundary event: her kelimede tetiklenir → mevcut pozisyonu kaydet
-  u.onboundary = (e) => {
-    if(e.name === "word"){
-      // Kaç kelime okundu hesapla
-      const spokenSoFar = remaining.slice(0, e.charIndex);
-      const wordsSpoken = spokenSoFar.trim() ? spokenSoFar.trim().split(/\s+/).length : 0;
-      speechWordIndex = wordIndex + wordsSpoken;
-    }
-  };
-
-  u.onstart = () => {
-    speechActive = true;
-    speechPaused = false;
-    setExpr("talking");
-    setStatus("Konuşuyor...","#a78bfa");
+async function speakElevenLabs(text){
+  try{
+    setExpr("talking"); setStatus("Konuşuyor...","#a78bfa");
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44);
-    updateVoiceBtn();
-  };
-  u.onend = () => {
-    speechActive = false;
-    speechPaused = false;
-    speechWordIndex = 0;
-    onSpeechEnd();
-  };
-  u.onerror = (e) => {
-    if(e.error !== "interrupted"){ speechActive=false; onSpeechEnd(); }
-  };
+    speechActive=true; updateVoiceBtn();
 
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream`,{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "xi-api-key": ELEVENLABS_KEY
+      },
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_multilingual_v2",
+        voice_settings:{
+          stability: 0.5,
+          similarity_boost: 0.75,
+          style: 0.3,
+          use_speaker_boost: true
+        }
+      })
+    });
+
+    if(!res.ok){ throw new Error("ElevenLabs hata: "+res.status); }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+
+    audio.onended = () => {
+      speechActive=false; speechPaused=false;
+      URL.revokeObjectURL(url); currentAudio=null;
+      setExpr("idle"); setStatus(`${currentChild?.name||""} ile`,"#4ade80");
+      const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+      updateVoiceBtn();
+    };
+    audio.onerror = () => {
+      speechActive=false; currentAudio=null;
+      setExpr("idle"); updateVoiceBtn();
+      // Fallback: tarayıcı sesine geç
+      speakBrowser(text);
+    };
+
+    audio.play();
+  }catch(e){
+    console.error("ElevenLabs hatası:", e);
+    speechActive=false; updateVoiceBtn();
+    setExpr("idle");
+    // Fallback
+    speakBrowser(text);
+  }
+}
+
+function speakBrowser(text){
+  if(!window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang="tr-TR";
+  const age=currentChild?.age||9;
+  if(age<=8){u.rate=0.82;u.pitch=1.45;}
+  else if(age<=12){u.rate=0.88;u.pitch=1.20;}
+  else{u.rate=0.92;u.pitch=1.05;}
+  const vs=window.speechSynthesis.getVoices();
+  const tv=vs.find(v=>v.lang.startsWith("tr")); if(tv) u.voice=tv;
+  u.onstart=()=>{speechActive=true;setExpr("talking");setStatus("Konuşuyor...","#a78bfa");const wrap=el("bibi-face-wrap");if(wrap)wrap.innerHTML=bibiFaceSVG("talking",44);updateVoiceBtn();};
+  u.onend=()=>{speechActive=false;setExpr("idle");setStatus(`${currentChild?.name||""} ile`,"#4ade80");const wrap=el("bibi-face-wrap");if(wrap)wrap.innerHTML=bibiFaceSVG("idle",44);updateVoiceBtn();};
   window.speechSynthesis.speak(u);
 }
 
-function onSpeechEnd(){
-  setExpr("idle");
-  setStatus(`${currentChild?.name||""} ile`,"#4ade80");
-  const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
-  updateVoiceBtn();
-}
-
-function speak(text){
-  if(!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  speechPaused = false;
-  speechActive = false;
-  const clean = cleanText(text);
-  if(!clean) return;
-  speechCurrentText = clean;
-  speechWords = clean.split(/\s+/).filter(Boolean);
-  speechWordIndex = 0;
-  setTimeout(()=>startSpeechFrom(0), 120);
-}
-
 function toggleVoice(){
-  if(!window.speechSynthesis) return;
+  if(!window.speechSynthesis && !elevenLabsEnabled) return;
 
   if(speechActive && !speechPaused){
-    // ── DURDUR ──
-    speechPaused = true;
-    speechActive = false;
-    // Mevcut pozisyonu kaydet ÖNCE, sonra cancel
-    const savedIndex = speechWordIndex;
-    window.speechSynthesis.cancel();
-    speechWordIndex = savedIndex; // cancel sıfırlamasın
-    setExpr("idle");
-    setStatus("Duraklatıldı ⏸","#fbbf24");
+    // Durdur
+    speechPaused=true; speechActive=false;
+    if(currentAudio){ currentAudio.pause(); }
+    else { window.speechSynthesis?.pause(); }
+    setExpr("idle"); setStatus("Duraklatıldı ⏸","#fbbf24");
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
     updateVoiceBtn();
-
   } else if(speechPaused){
-    // ── DEVAM ET ──
-    speechPaused = false;
-    setTimeout(()=>startSpeechFrom(speechWordIndex), 120);
-
+    // Devam et
+    speechPaused=false; speechActive=true;
+    if(currentAudio){ currentAudio.play(); setExpr("talking"); setStatus("Konuşuyor...","#a78bfa"); const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44); }
+    else { window.speechSynthesis?.resume(); }
+    updateVoiceBtn();
   } else {
-    // ── SES AÇ/KAPAT ──
-    voiceOn = !voiceOn;
-    if(!voiceOn){ window.speechSynthesis.cancel(); speechActive=false; speechPaused=false; onSpeechEnd(); }
+    voiceOn=!voiceOn;
+    if(!voiceOn){ if(currentAudio){currentAudio.pause();currentAudio=null;} window.speechSynthesis?.cancel(); speechActive=false; }
     updateVoiceBtn();
   }
 }
+
+function showVoiceSelector(){
+  const existing = document.getElementById("voice-selector-modal");
+  if(existing){ existing.remove(); return; }
+
+  const modal = document.createElement("div");
+  modal.id = "voice-selector-modal";
+  modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .2s ease;font-family:'Nunito',sans-serif";
+  modal.innerHTML = `
+    <div style="width:100%;max-width:420px;background:linear-gradient(135deg,#1A2E2A,#243d38);border-radius:24px 24px 0 0;padding:24px 20px 36px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="color:white;font-size:17px;font-weight:900">🎤 Ses Seç</div>
+          <div style="color:rgba(255,255,255,.45);font-size:12px;margin-top:2px">Bibi'nin sesi</div>
+        </div>
+        <button onclick="document.getElementById('voice-selector-modal').remove()" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:white;font-size:16px">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        ${ELEVENLABS_VOICES.map(v=>`
+        <button onclick="selectVoice('${v.id}');document.getElementById('voice-selector-modal').remove()"
+          style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;border:1.5px solid ${selectedVoiceId===v.id?'rgba(13,155,126,.6)':'rgba(255,255,255,.1)'};background:${selectedVoiceId===v.id?'rgba(13,155,126,.15)':'rgba(255,255,255,.05)'};cursor:pointer;text-align:left;transition:all .2s">
+          <div style="width:40px;height:40px;border-radius:50%;background:${v.gender==='female'?'linear-gradient(135deg,#ec4899,#a855f7)':'linear-gradient(135deg,#2563eb,#0D9B7E)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">
+            ${v.gender==='female'?'👩':'👨'}
+          </div>
+          <div style="flex:1">
+            <div style="color:white;font-size:14px;font-weight:800">${v.name}</div>
+            <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${v.label}</div>
+          </div>
+          ${selectedVoiceId===v.id?'<div style="color:#4ade80;font-size:18px">✓</div>':''}
+        </button>`).join("")}
+      </div>
+      <div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.05);display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🌐</span>
+        <div style="flex:1">
+          <div style="color:rgba(255,255,255,.6);font-size:12px;font-weight:600">Tarayıcı Sesi (ücretsiz, düşük kalite)</div>
+        </div>
+        <button onclick="toggleBrowserVoice()" id="browser-voice-btn" style="padding:6px 12px;border-radius:8px;border:none;background:${!elevenLabsEnabled?'#0D9B7E':'rgba(255,255,255,.1)'};color:white;font-size:12px;font-weight:700;cursor:pointer">${!elevenLabsEnabled?'Aktif':'Etkinleştir'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.onclick = e => { if(e.target===modal) modal.remove(); };
+}
+
+function selectVoice(voiceId){
+  selectedVoiceId = voiceId;
+  elevenLabsEnabled = true;
+}
+
+function toggleBrowserVoice(){
+  elevenLabsEnabled = !elevenLabsEnabled;
+  const btn = document.getElementById("browser-voice-btn");
+  if(btn) btn.textContent = !elevenLabsEnabled ? "Aktif" : "Etkinleştir";
+  if(btn) btn.style.background = !elevenLabsEnabled ? "#0D9B7E" : "rgba(255,255,255,.1)";
+}
+
 
 function updateVoiceBtn(){
   const btn=el("voice-btn"); if(!btn) return;
   if(speechActive && !speechPaused){
     btn.style.background="rgba(167,139,250,.35)";
     btn.innerHTML=`<svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="6" y="4" width="4" height="16" rx="1" fill="white"/><rect x="14" y="4" width="4" height="16" rx="1" fill="white"/></svg>`;
-    btn.title="Durdur";
   } else if(speechPaused){
     btn.style.background="rgba(251,191,36,.35)";
     btn.innerHTML=`<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>`;
-    btn.title="Devam et";
   } else {
     btn.style.background=voiceOn?"rgba(255,255,255,.2)":"rgba(0,0,0,.3)";
     btn.innerHTML=voiceOn
       ?`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="white"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>`
       :`<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polygon points="11,5 6,9 2,9 2,15 6,15 11,19" fill="rgba(255,255,255,.4)"/><line x1="23" y1="9" x2="17" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round"/></svg>`;
-    btn.title=voiceOn?"Sesi kapat":"Sesi aç";
   }
-
-  // Mesaj butonlarını da güncelle
   document.querySelectorAll(".msg-speak-btn").forEach(b=>{
-    if(speechActive && !speechPaused){
-      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="6" height="12" rx="1" fill="white"/><rect x="12" y="3" width="6" height="12" rx="1" fill="white"/></svg>';
-      b.title="Durdur";
-    } else if(speechPaused){
-      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,2 18,9 5,16" fill="white"/></svg>';
-      b.title="Devam et";
-    } else {
-      b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';
-      b.title="Dinle";
-    }
+    if(speechActive&&!speechPaused){b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="6" height="12" rx="1" fill="white"/><rect x="12" y="3" width="6" height="12" rx="1" fill="white"/></svg>';}
+    else if(speechPaused){b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,2 18,9 5,16" fill="white"/></svg>';}
+    else{b.innerHTML='<svg width="9" height="9" viewBox="0 0 24 24" fill="none"><polygon points="5,3 19,12 5,21" fill="white"/></svg>';}
   });
-}
-
-function toggleMic(){
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){ const e=el("mic-err"); if(e){e.textContent="Chrome kullan! 🎙️";e.style.display="block";setTimeout(()=>e.style.display="none",3000);} return; }
-  if(isListening){ recognition?.stop(); return; }
-  recognition=new SR(); recognition.lang="tr-TR"; recognition.continuous=false; recognition.interimResults=true;
-  recognition.onstart=()=>{ isListening=true; setExpr("listening"); setStatus("Seni dinliyorum 🎙️","#F4845F"); const btn=el("mic-btn"); if(btn) btn.style.background="#F4845F"; };
-  recognition.onresult=e=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; const inp=el("chat-input"); if(inp) inp.value=t; };
-  recognition.onend=()=>{ isListening=false; setExpr("idle"); setStatus("Seninle burada!","#4ade80"); const btn=el("mic-btn"); if(btn) btn.style.background="rgba(255,255,255,.15)"; };
-  recognition.onerror=e=>{ isListening=false; const err=el("mic-err"); if(err){err.textContent=e.error==="not-allowed"?"Mikrofon izni gerekli!":"Ses duyamadım 🎤";err.style.display="block";setTimeout(()=>err.style.display="none",3000);} };
-  recognition.start();
 }
 
 // ══════════════════════════════════════════════════════════════
