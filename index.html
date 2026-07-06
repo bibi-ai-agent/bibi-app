@@ -3050,6 +3050,9 @@ async function startChat(child){
   if(typeof child==="string") child=JSON.parse(child);
   currentChild=child; messages=[]; sessionStart=new Date();
   const theme=getTheme(child);
+
+  // 6-8 yaş → ses otomatik açık
+  voiceOn = child.age <= 8;
   const miniSize = 36; // Bibi mini boyutu mesaj yanında
 
   render(`
@@ -3178,11 +3181,25 @@ async function startChat(child){
   // Session ilk mesaj gönderilince oluşturulacak (boş oturum kaydı önlenir)
   sessionId = null;
   const openMsg = child.age<=8
-    ? `Heyyyy ${child.name}! Bugün benimle ne öğrenmek istersin? 🎉`
+    ? `Heyyyy ${child.name}! 🎉 Seninle konuşmak çok güzel! Bana sesli konuşabilirsin, mikrofon butonuna bas! 🎤`
     : child.age<=12
     ? `Merhaba ${child.name}! Bugün ne keşfetmek istersin?`
     : `Selam ${child.name}. Bugün ne konuşacağız?`;
   addMsg("bibi", openMsg);
+
+  // Ses butonunu başlangıç durumuna göre güncelle
+  setTimeout(()=>{
+    updateVoiceBtn();
+    // 6-8 yaş → mic butonunu vurgula
+    if(child.age <= 8){
+      const micBtn = document.getElementById("mic-btn");
+      if(micBtn){
+        micBtn.style.background = "rgba(74,222,128,.3)";
+        micBtn.style.borderColor = "rgba(74,222,128,.5)";
+        micBtn.style.boxShadow = "0 0 12px rgba(74,222,128,.4)";
+      }
+    }
+  }, 300);
 }
 
 function setExpr(expr){
