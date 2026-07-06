@@ -2114,10 +2114,33 @@ const TOPIC_ICONS = {"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛�
 async function generateAndShowReport(childId){
   const btn = document.getElementById("gen-report-btn");
   if(btn){ btn.textContent="⏳ Hazırlanıyor..."; btn.disabled=true; }
-  const {data:child} = await sb.from("children").select("*").eq("id",childId).single();
-  if(!child) return;
-  await generateWeeklyReport(child);
-  screenReport(child);
+
+  // Mevcut ekranda overlay göster — ekranı yeniden render etme
+  const overlay = document.createElement("div");
+  overlay.id = "report-gen-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(8px);z-index:999;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif";
+  overlay.innerHTML = `
+    <div style="background:linear-gradient(135deg,#1A2E2A,#243d38);border-radius:20px;padding:28px 24px;text-align:center;max-width:280px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+      <div style="font-size:40px;margin-bottom:12px;animation:bounce 1.5s ease-in-out infinite">✨</div>
+      <div style="color:white;font-size:16px;font-weight:800;margin-bottom:8px">AI Rapor Hazırlanıyor</div>
+      <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:20px">Tüm konuşmalar analiz ediliyor...</div>
+      <div style="display:flex;gap:6px;justify-content:center">
+        ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:dotPulse 1.2s ease ${i*.2}s infinite"></div>`).join("")}
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  try{
+    const {data:child} = await sb.from("children").select("*").eq("id",childId).single();
+    if(!child){ overlay.remove(); return; }
+    await generateWeeklyReport(child);
+    overlay.remove();
+    screenReport(child);
+  }catch(e){
+    overlay.remove();
+    if(btn){ btn.textContent="✨ AI Rapor"; btn.disabled=false; }
+    alert("Rapor oluşturulamadı, tekrar dene.");
+  }
 }
 
 async function screenReport(child){
