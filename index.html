@@ -2197,15 +2197,34 @@ async function checkPin(){
   if(parent?.pin === pinEntry){
     // PIN doğru — overlay göster, veri gelince render et
     const overlay = document.createElement("div");
-    overlay.style.cssText = "position:fixed;inset:0;background:rgba(26,46,42,.95);z-index:999;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif";
+    overlay.style.cssText = "position:fixed;inset:0;background:linear-gradient(135deg,#1A2E2A,#243d38);z-index:999;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif";
     overlay.innerHTML = `
-      <div style="text-align:center">
-        ${bibiFaceSVG("thinking",64)}
-        <div style="color:rgba(255,255,255,.6);font-size:14px;font-weight:600;margin-top:14px">Rapor yükleniyor...</div>
+      <div style="text-align:center;padding:20px">
+        <div style="animation:breathe 2s ease-in-out infinite;margin-bottom:20px">${bibiFaceSVG("thinking",70)}</div>
+        <div style="color:white;font-size:16px;font-weight:800;margin-bottom:6px">Rapor Hazırlanıyor</div>
+        <div id="loading-step" style="color:rgba(255,255,255,.45);font-size:13px;margin-bottom:20px">Veriler yükleniyor...</div>
+        <div style="width:200px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;overflow:hidden;margin:0 auto">
+          <div id="loading-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#0D9B7E,#7C3AED);border-radius:4px;transition:width .4s ease"></div>
+        </div>
       </div>`;
     document.body.appendChild(overlay);
 
+    // Progress animasyonu
+    const steps = ["Oturumlar alınıyor...","Duygular analiz ediliyor...","Rapor oluşturuluyor..."];
+    let step = 0;
+    const timer = setInterval(()=>{
+      const bar = document.getElementById("loading-bar");
+      const txt = document.getElementById("loading-step");
+      if(bar) bar.style.width = `${Math.min(90, (step+1)*30)}%`;
+      if(txt && steps[step]) txt.textContent = steps[step];
+      step++;
+    }, 400);
+
     await screenReport(pinTarget);
+    clearInterval(timer);
+    const bar = document.getElementById("loading-bar");
+    if(bar) bar.style.width = "100%";
+    await new Promise(r=>setTimeout(r,200));
     overlay.remove();
   } else {
     const err = el("pin-err"); if(err) err.style.display="block";
@@ -2252,13 +2271,19 @@ async function generateAndShowReport(childId){
 async function screenReport(child){
   if(typeof child==="string") child=JSON.parse(child);
 
+  // Tüm verileri tek seferde paralel çek
   const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-7);
 
-  const [{data:mastery=[]},{data:sessions=[]},{data:emotions=[]},{data:weeklyReports=[]}] = await Promise.all([
-    sb.from("mastery").select("*").eq("child_id",child.id).order("score",{ascending:false}),
-    sb.from("sessions").select("*").eq("child_id",child.id).order("started_at",{ascending:false}).limit(10),
-    sb.from("emotion_logs").select("*").eq("child_id",child.id).order("created_at",{ascending:false}).limit(50),
-    sb.from("weekly_reports").select("*").eq("child_id",child.id).order("created_at",{ascending:false}).limit(1)
+  const [
+    {data:mastery=[]},
+    {data:sessions=[]},
+    {data:emotions=[]},
+    {data:weeklyReports=[]}
+  ] = await Promise.all([
+    sb.from("mastery").select("topic,score,message_count").eq("child_id",child.id).order("score",{ascending:false}).limit(8),
+    sb.from("sessions").select("started_at,duration_mins,message_count").eq("child_id",child.id).order("started_at",{ascending:false}).limit(5),
+    sb.from("emotion_logs").select("emotion,interest_area,character_hint").eq("child_id",child.id).order("created_at",{ascending:false}).limit(30),
+    sb.from("weekly_reports").select("summary,created_at,dominant_emotion,top_interests").eq("child_id",child.id).order("created_at",{ascending:false}).limit(1)
   ]);
 
   const totalMinutes = sessions.reduce((s,x)=>s+(x.duration_mins||0),0);
