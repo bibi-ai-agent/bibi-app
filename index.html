@@ -2145,12 +2145,6 @@ async function generateAndShowReport(childId){
 
 async function screenReport(child){
   if(typeof child==="string") child=JSON.parse(child);
-  render(`<div style="min-height:100vh;background:#F8FBFA;display:flex;align-items:center;justify-content:center">
-    <div style="text-align:center">
-      ${bibiFaceSVG("thinking",70)}
-      <div style="color:#6B7280;font-size:14px;font-weight:600;margin-top:14px">Rapor yükleniyor...</div>
-    </div>
-  </div>`);
 
   const weekStart = new Date(); weekStart.setDate(weekStart.getDate()-7);
 
