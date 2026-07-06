@@ -1727,13 +1727,12 @@ function screenAuth(){
             <button onclick="selectGender('kız')" id="g-kiz" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👧 Kız</button>
             <button onclick="selectGender('erkek')" id="g-erkek" style="flex:1;padding:12px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👦 Erkek</button>
           </div>
-          <select class="inp-dark" id="r-cage" style="cursor:pointer">
+          <select class="inp-dark" id="r-cage" style="cursor:pointer" onchange="updateGradeOptions(this.value,'r-grade')">
             <option value="">Çocuğun yaşı</option>
-            ${Array.from({length:12},(_,i)=>i+4).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
+            ${Array.from({length:10},(_,i)=>i+6).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
           </select>
           <select class="inp-dark" id="r-grade" style="cursor:pointer">
-            <option value="">Kaçıncı sınıf?</option>
-            ${["Okul öncesi","1. Sınıf","2. Sınıf","3. Sınıf","4. Sınıf","5. Sınıf","6. Sınıf","7. Sınıf","8. Sınıf","9. Sınıf","10. Sınıf","11. Sınıf","12. Sınıf"].map((g,i)=>`<option value="${g}">${g}</option>`).join("")}
+            <option value="">Önce yaş seçin</option>
           </select>
           <div id="reg-msg-3" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px"></div>
           <div style="display:flex;gap:8px">
@@ -2539,13 +2538,12 @@ async function screenChildren(){
             <button onclick="selectNewGender('kız')" id="ng-kiz" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👧 Kız</button>
             <button onclick="selectNewGender('erkek')" id="ng-erkek" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid #e0f0ec;background:white;color:#6B7280;font-weight:700;font-size:14px;cursor:pointer;transition:all .2s">👦 Erkek</button>
           </div>
-          <select id="new-age" class="inp-light">
+          <select id="new-age" class="inp-light" onchange="updateGradeOptions(this.value)">
             <option value="">Yaş seçin</option>
-            ${Array.from({length:12},(_,i)=>i+4).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
+            ${Array.from({length:10},(_,i)=>i+6).map(a=>`<option value="${a}">${a} yaş</option>`).join("")}
           </select>
           <select id="new-grade" class="inp-light">
-            <option value="">Sınıf seçin</option>
-            ${["Okul öncesi","1. Sınıf","2. Sınıf","3. Sınıf","4. Sınıf","5. Sınıf","6. Sınıf","7. Sınıf","8. Sınıf","9. Sınıf","10. Sınıf","11. Sınıf","12. Sınıf"].map(g=>`<option value="${g}">${g}</option>`).join("")}
+            <option value="">Önce yaş seçin</option>
           </select>
         </div>
         <div style="display:flex;gap:10px;margin-top:14px">
@@ -2562,7 +2560,30 @@ async function screenChildren(){
   </div>`);
 }
 
-let newGender = "", newAvatarData = "", newAvatarType = ""; // type: "emoji" | "photo" | ""
+// ── Yaşa göre sınıf seçenekleri ──────────────────────────────
+function updateGradeOptions(age, targetId="new-grade"){
+  const gradeMap = {
+    6:  ["Okul öncesi", "1. Sınıf"],
+    7:  ["1. Sınıf", "2. Sınıf"],
+    8:  ["2. Sınıf", "3. Sınıf"],
+    9:  ["3. Sınıf", "4. Sınıf"],
+    10: ["4. Sınıf", "5. Sınıf"],
+    11: ["5. Sınıf", "6. Sınıf"],
+    12: ["6. Sınıf", "7. Sınıf"],
+    13: ["7. Sınıf", "8. Sınıf"],
+    14: ["8. Sınıf"],
+    15: ["8. Sınıf"],
+  };
+  const gradeEl = document.getElementById(targetId);
+  if(!gradeEl) return;
+  const options = gradeMap[parseInt(age)] || [];
+  gradeEl.innerHTML = options.length
+    ? `<option value="">Sınıf seçin</option>` + options.map(g=>`<option value="${g}">${g}</option>`).join("")
+    : `<option value="">Önce yaş seçin</option>`;
+  if(options.length === 1) gradeEl.value = options[0]; // Tek seçenek varsa otomatik seç
+}
+
+ // type: "emoji" | "photo" | ""
 
 function selectEmoji(emoji){
   newAvatarData = emoji;
