@@ -63,7 +63,7 @@
   </style>
 </head>
 <body>
-<div id="root" style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center"></div>
+<div id="root" style="width:100%;min-height:100vh;overflow-x:hidden;box-sizing:border-box"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
@@ -2476,32 +2476,37 @@ async function screenReport(child){
         </div>`).join("")}
       </div>` : ""}
 
-      <!-- Gelişim Raporu — Accordion -->
-      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px">
+      <!-- Gelişim Raporu — Accordion + Ayrı Buton -->
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:12px">
         <button onclick="toggleReportAccordion()" id="report-accordion-btn"
-          style="width:100%;padding:18px;border:none;background:linear-gradient(135deg,#1A2E2A,#243d38);color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left">
+          style="width:100%;padding:16px 18px;border:none;background:linear-gradient(135deg,#1A2E2A,#243d38);color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left;box-sizing:border-box">
           <div style="display:flex;align-items:center;gap:10px">
-            <span style="font-size:20px">✨</span>
+            <span style="font-size:18px">✨</span>
             <div>
-              <div style="font-size:15px;font-weight:800">Gelişim Raporu</div>
-              <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">
-                ${lastReport ? `${new Date(lastReport.created_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})} • ${reportFresh?`${7-reportAge} gün sonra yenilenir`:"Güncelleme mevcut"}` : "Henüz oluşturulmadı"}
+              <div style="font-size:14px;font-weight:800">Gelişim Raporu</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.45);margin-top:1px">
+                ${lastReport
+                  ? `${new Date(lastReport.created_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})} • ${reportFresh?`${7-reportAge} gün sonra yenilenir`:"Güncelleme mevcut"}`
+                  : "Henüz oluşturulmadı — aşağıdaki butona bas"}
               </div>
             </div>
           </div>
-          <span id="accordion-arrow" style="font-size:18px;transition:transform .3s">▼</span>
+          <span id="accordion-arrow" style="font-size:16px;transition:transform .3s;flex-shrink:0">▼</span>
         </button>
-        <div id="report-accordion-body" style="display:none;padding:18px">
-          ${lastReport ? `
-          <div style="color:#374151;font-size:13px;line-height:1.8;white-space:pre-line;margin-bottom:14px">${lastReport.summary}</div>
-          ${!reportFresh ? `<button onclick="requestNewReport('${child.id}')" style="width:100%;padding:11px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:13px;cursor:pointer">🔄 Raporu Güncelle</button>` : ""}
-          ` : `
-          <div style="text-align:center;padding:10px 0">
-            <div style="color:#9CA3AF;font-size:13px;margin-bottom:14px">${child.name} için henüz gelişim raporu oluşturulmadı.</div>
-            <button onclick="requestNewReport('${child.id}')" style="padding:12px 24px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:14px;cursor:pointer">✨ Raporu Oluştur</button>
-          </div>`}
+        <div id="report-accordion-body" style="display:none;padding:16px">
+          ${lastReport
+            ? `<div style="color:#374151;font-size:13px;line-height:1.8;white-space:pre-line">${lastReport.summary}</div>`
+            : `<div style="color:#9CA3AF;font-size:13px;text-align:center;padding:8px 0">Henüz rapor oluşturulmadı.</div>`}
         </div>
       </div>
+
+      <!-- Ayrı Rapor Butonu -->
+      <button onclick="requestNewReport('${child.id}')"
+        style="width:100%;padding:15px;border-radius:16px;border:none;background:linear-gradient(135deg,#0D9B7E,#7C3AED);color:white;font-weight:800;font-size:14px;cursor:pointer;box-shadow:0 4px 16px rgba(13,155,126,.25);box-sizing:border-box">
+        ${lastReport
+          ? (reportFresh ? `🔄 Raporu Yenile (${7-reportAge} gün kaldı)` : "🔄 Yeni Rapor Al")
+          : "✨ İlk Gelişim Raporunu Oluştur"}
+      </button>
 
     </div>
   </div>`);
