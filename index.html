@@ -2284,12 +2284,11 @@ async function screenReport(child){
     sb.from("mastery").select("topic,score,message_count").eq("child_id",child.id).order("score",{ascending:false}).limit(8),
     sb.from("sessions").select("started_at,duration_mins,message_count").eq("child_id",child.id).order("started_at",{ascending:false}).limit(5),
     sb.from("emotion_logs").select("emotion,interest_area,character_hint").eq("child_id",child.id).order("created_at",{ascending:false}).limit(30),
-    sb.from("weekly_reports").select("summary,created_at,dominant_emotion,top_interests").eq("child_id",child.id).order("created_at",{ascending:false}).limit(1)
+    sb.from("weekly_reports").select("summary,created_at").eq("child_id",child.id).order("created_at",{ascending:false}).limit(1)
   ]);
 
   const emotions = emotionResult?.data || [];
   const lastReport = weeklyReports?.[0] || null;
-
   const totalMinutes = sessions.reduce((s,x)=>s+(x.duration_mins||0),0);
   const totalMessages = sessions.reduce((s,x)=>s+(x.message_count||0),0);
   const totalSessions = sessions.length;
@@ -2302,25 +2301,29 @@ async function screenReport(child){
   });
   const dominantEmotion = Object.entries(emotionCounts).sort((a,b)=>b[1]-a[1])[0]?.[0];
   const topInterests = Object.entries(interestCounts).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  const totalEmotions = emotions.length;
 
   const emotionEmojis={happy:"😊",excited:"🤩",curious:"🔍",calm:"😌",sad:"😢",frustrated:"😤",bored:"😴",anxious:"😰"};
   const emotionLabels={happy:"Mutlu",excited:"Heyecanlı",curious:"Meraklı",calm:"Sakin",sad:"Üzgün",frustrated:"Sinirli",bored:"Sıkılmış",anxious:"Endişeli"};
   const emotionColors={happy:"#4ade80",excited:"#f59e0b",curious:"#60a5fa",calm:"#a78bfa",sad:"#94a3b8",frustrated:"#f87171",bored:"#9ca3af",anxious:"#fb923c"};
   const interestIcons={sanat:"🎨",spor:"⚽",bilim:"🔬",müzik:"🎵",oyun:"🎮",doğa:"🌿",sosyal:"👥",teknoloji:"💻",edebiyat:"📚",matematik:"📐",genel:"🌍"};
-  const specialtyIcons={"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
   const topicColors={"Matematik":"#2563EB","Fen":"#16A34A","Dil":"#9333EA","Tarih":"#EA580C","Genel":"#6B7280"};
+  const topicIcons={"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
 
-  // 7 günlük rapor cache kontrolü
-  const now = new Date();
-  const reportAge = lastReport ? Math.floor((now - new Date(lastReport.created_at)) / (1000*60*60*24)) : 999;
+  const reportAge = lastReport ? Math.floor((new Date()-new Date(lastReport.created_at))/(1000*60*60*24)) : 999;
   const reportFresh = reportAge < 7;
   const reportBtnLabel = lastReport
-    ? (reportFresh ? `✨ Gelişim Raporu (${reportAge} gün önce güncellendi)` : "✨ Gelişim Raporu Al (7 gün doldu, yenile)")
+    ? (reportFresh ? `✨ Gelişim Raporu <span style="font-size:11px;opacity:.7">(${reportAge} gün önce)</span>` : `✨ Gelişim Raporu <span style="font-size:11px;opacity:.7">(Güncelle)</span>`)
     : "✨ İlk Gelişim Raporunu Al";
 
   const avatarHtml = child.avatar_photo
     ? `<img src="${child.avatar_photo}" style="width:100%;height:100%;object-fit:cover"/>`
     : child.avatar_emoji || (child.gender==="kız"?"👧":"👦");
+
+  // Duygusal denge skoru (pozitif duygular / toplam)
+  const positiveEmotions = ['happy','excited','curious','calm'];
+  const positiveCount = Object.entries(emotionCounts).filter(([e])=>positiveEmotions.includes(e)).reduce((s,[,c])=>s+c,0);
+  const balanceScore = totalEmotions > 0 ? Math.round(positiveCount/totalEmotions*100) : null;
 
   render(`
   <div style="min-height:100vh;background:linear-gradient(135deg,#f0f7f5,#F8FBFA)">
@@ -2329,7 +2332,7 @@ async function screenReport(child){
     <div style="background:linear-gradient(135deg,#1A2E2A,#243d38);padding:20px;position:sticky;top:0;z-index:10">
       <div style="max-width:520px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.3);background:#0D9B7E;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">${avatarHtml}</div>
+          <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.3);background:#0D9B7E;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${avatarHtml}</div>
           <div>
             <div style="color:rgba(255,255,255,.5);font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase">Gelişim Raporu</div>
             <div style="color:white;font-size:18px;font-weight:900">${child.name}</div>
@@ -2341,7 +2344,7 @@ async function screenReport(child){
 
     <div style="max-width:520px;margin:0 auto;padding:20px 16px 60px">
 
-      <!-- Özet stat kartları -->
+      <!-- 3 stat -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
         <div style="background:white;border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.06)">
           <div style="font-size:22px">⏱️</div>
@@ -2360,72 +2363,108 @@ async function screenReport(child){
         </div>
       </div>
 
-      <!-- Baskın duygu -->
-      ${dominantEmotion ? `
-      <div style="background:white;border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);display:flex;align-items:center;gap:14px">
-        <div style="font-size:40px">${emotionEmojis[dominantEmotion]||"😊"}</div>
-        <div>
-          <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:1px">Baskın Duygu Durumu</div>
-          <div style="font-size:18px;font-weight:900;color:#1A2E2A;margin-top:2px">${emotionLabels[dominantEmotion]||dominantEmotion}</div>
-        </div>
-      </div>` : ""}
-
-      <!-- Duygu haritası -->
-      ${emotions.length>0 ? `
+      <!-- Duygusal Denge Skoru -->
+      ${balanceScore !== null ? `
       <div style="background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:12px">😊 Duygu Haritası</div>
-        <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:14px">💙 Duygusal Denge Skoru</div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <div style="position:relative;width:80px;height:80px;flex-shrink:0">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="#f3f4f6" stroke-width="8"/>
+              <circle cx="40" cy="40" r="34" fill="none" stroke="${balanceScore>=70?"#4ade80":balanceScore>=40?"#f59e0b":"#f87171"}" stroke-width="8"
+                stroke-dasharray="${2*Math.PI*34}" stroke-dashoffset="${2*Math.PI*34*(1-balanceScore/100)}"
+                stroke-linecap="round" transform="rotate(-90 40 40)"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#1A2E2A">${balanceScore}%</div>
+          </div>
+          <div>
+            <div style="font-size:16px;font-weight:800;color:${balanceScore>=70?"#16A34A":balanceScore>=40?"#D97706":"#DC2626"}">
+              ${balanceScore>=70?"Çok İyi 🌟":balanceScore>=40?"Dengeli 👍":"Dikkat Gerekiyor ⚠️"}
+            </div>
+            <div style="color:#6B7280;font-size:13px;margin-top:4px;line-height:1.4">
+              ${balanceScore>=70?`${child.name} genel olarak pozitif ve mutlu görünüyor`:balanceScore>=40?"Duygusal denge iyi seviyede":"Bazı zorluklarla başa çıkmaya çalışıyor olabilir"}
+            </div>
+          </div>
+        </div>
+
+        <!-- Duygu dağılımı -->
+        <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px">
           ${Object.entries(emotionCounts).sort((a,b)=>b[1]-a[1]).map(([e,c])=>{
-            const pct=Math.round(c/emotions.length*100);
-            return `<div style="display:flex;align-items:center;gap:5px;background:${emotionColors[e]||'#e5e7eb'}22;border:1px solid ${emotionColors[e]||'#e5e7eb'}55;border-radius:20px;padding:5px 10px">
-              <span style="font-size:14px">${emotionEmojis[e]||"😐"}</span>
-              <span style="font-size:12px;font-weight:700;color:#1A2E2A">${emotionLabels[e]||e}</span>
-              <span style="font-size:11px;color:#6B7280">%${pct}</span>
+            const pct=Math.round(c/totalEmotions*100);
+            return `<div style="display:flex;align-items:center;gap:4px;background:${emotionColors[e]||'#e5e7eb'}18;border:1px solid ${emotionColors[e]||'#e5e7eb'}44;border-radius:20px;padding:4px 10px">
+              <span style="font-size:13px">${emotionEmojis[e]||"😐"}</span>
+              <span style="font-size:12px;font-weight:700;color:#374151">${emotionLabels[e]||e}</span>
+              <span style="font-size:11px;color:#9CA3AF">%${pct}</span>
             </div>`;
           }).join("")}
         </div>
-      </div>` : ""}
+      </div>` : `
+      <div style="background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06);text-align:center">
+        <div style="font-size:28px;margin-bottom:8px">💙</div>
+        <div style="color:#9CA3AF;font-size:13px">Duygu verisi henüz yok.<br/>Birkaç konuşmadan sonra burada görünür.</div>
+      </div>`}
 
-      <!-- İlgi alanları -->
+      <!-- İlgi Alanları -->
       ${topInterests.length>0 ? `
       <div style="background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:12px">⭐ İlgi Alanları</div>
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:14px">⭐ İlgi Alanları</div>
         ${topInterests.map(([area,count])=>{
-          const pct=Math.round(count/emotions.length*100);
-          return `<div style="margin-bottom:10px">
-            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          const pct=Math.round(count/totalEmotions*100);
+          return `<div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
               <span style="font-size:13px;font-weight:700;color:#1A2E2A">${interestIcons[area]||"🌍"} ${area.charAt(0).toUpperCase()+area.slice(1)}</span>
               <span style="font-size:12px;color:#0D9B7E;font-weight:800">%${pct}</span>
             </div>
-            <div style="height:6px;background:#f3f4f6;border-radius:8px;overflow:hidden">
+            <div style="height:7px;background:#f3f4f6;border-radius:8px;overflow:hidden">
               <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#0D9B7E,#7C3AED);border-radius:8px"></div>
             </div>
           </div>`;
         }).join("")}
       </div>` : ""}
 
-      <!-- Akademik ustalık -->
+      <!-- Karakter Gözlemleri -->
+      ${charHints.length>0 ? `
+      <div style="background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:12px">🧠 Karakter Gözlemleri</div>
+        ${[...new Set(charHints)].slice(0,4).map(h=>`
+        <div style="display:flex;gap:8px;padding:10px 12px;background:#f8fbfa;border-radius:10px;border-left:3px solid #0D9B7E;margin-bottom:8px">
+          <span>💙</span>
+          <span style="font-size:13px;color:#374151;line-height:1.5">${h}</span>
+        </div>`).join("")}
+      </div>` : ""}
+
+      <!-- Akademik Ustalık -->
       ${mastery.length>0 ? `
       <div style="background:white;border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
-        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:12px">📊 Akademik Ustalık</div>
+        <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:14px">📊 Akademik Ustalık</div>
         ${mastery.map(m=>`
-        <div style="margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:13px;font-weight:700;color:#1A2E2A">${specialtyIcons[m.topic]||"🌍"} ${m.topic}</span>
-            <span style="font-size:12px;color:${topicColors[m.topic]||"#6B7280"};font-weight:800">%${m.score}</span>
+        <div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:16px">${topicIcons[m.topic]||"🌍"}</span>
+              <span style="font-size:13px;font-weight:800;color:#1A2E2A">${m.topic}</span>
+              <span style="font-size:11px;color:#9CA3AF">${m.message_count} etkileşim</span>
+            </div>
+            <div style="background:${topicColors[m.topic]||"#6B7280"}18;border-radius:20px;padding:3px 10px">
+              <span style="font-size:12px;font-weight:800;color:${topicColors[m.topic]||"#6B7280"}">%${m.score}</span>
+            </div>
           </div>
-          <div style="height:6px;background:#f3f4f6;border-radius:8px;overflow:hidden">
-            <div style="height:100%;width:${m.score}%;background:${topicColors[m.topic]||"#6B7280"};border-radius:8px"></div>
+          <div style="height:8px;background:#f3f4f6;border-radius:8px;overflow:hidden">
+            <div style="height:100%;width:${m.score}%;background:${topicColors[m.topic]||"#6B7280"};border-radius:8px;transition:width .6s ease"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:3px">
+            <span style="font-size:10px;color:#C4C4C4">Başlangıç</span>
+            <span style="font-size:10px;color:#C4C4C4">Uzman</span>
           </div>
         </div>`).join("")}
       </div>` : ""}
 
-      <!-- Son sohbetler -->
+      <!-- Son Sohbetler -->
       ${sessions.length>0 ? `
-      <div style="background:white;border-radius:16px;padding:18px;margin-bottom:20px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
+      <div style="background:white;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.06)">
         <div style="font-size:14px;font-weight:800;color:#1A2E2A;margin-bottom:12px">🕐 Son Sohbetler</div>
         ${sessions.map(s=>`
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f3f4f6">
+        <div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f3f4f6">
           <div>
             <div style="font-size:13px;font-weight:700;color:#1A2E2A">${new Date(s.started_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})}</div>
             <div style="font-size:11px;color:#9CA3AF">${new Date(s.started_at).toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"})}</div>
@@ -2437,29 +2476,44 @@ async function screenReport(child){
         </div>`).join("")}
       </div>` : ""}
 
-      <!-- Mevcut AI Rapor (varsa göster) -->
-      ${lastReport ? `
-      <div style="background:linear-gradient(135deg,rgba(124,58,237,.05),rgba(13,155,126,.05));border:1.5px solid rgba(13,155,126,.2);border-radius:16px;padding:18px;margin-bottom:16px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:18px">✨</span>
+      <!-- Gelişim Raporu — Accordion -->
+      <div style="background:white;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:16px">
+        <button onclick="toggleReportAccordion()" id="report-accordion-btn"
+          style="width:100%;padding:18px;border:none;background:linear-gradient(135deg,#1A2E2A,#243d38);color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="font-size:20px">✨</span>
             <div>
-              <div style="font-size:14px;font-weight:800;color:#1A2E2A">Gelişim Raporu</div>
-              <div style="font-size:11px;color:#6B7280">${new Date(lastReport.created_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})} • ${reportFresh?`${7-reportAge} gün sonra yenilenir`:"Güncelleme mevcut"}</div>
+              <div style="font-size:15px;font-weight:800">Gelişim Raporu</div>
+              <div style="font-size:11px;color:rgba(255,255,255,.5);margin-top:2px">
+                ${lastReport ? `${new Date(lastReport.created_at).toLocaleDateString("tr-TR",{day:"numeric",month:"long"})} • ${reportFresh?`${7-reportAge} gün sonra yenilenir`:"Güncelleme mevcut"}` : "Henüz oluşturulmadı"}
+              </div>
             </div>
           </div>
+          <span id="accordion-arrow" style="font-size:18px;transition:transform .3s">▼</span>
+        </button>
+        <div id="report-accordion-body" style="display:none;padding:18px">
+          ${lastReport ? `
+          <div style="color:#374151;font-size:13px;line-height:1.8;white-space:pre-line;margin-bottom:14px">${lastReport.summary}</div>
+          ${!reportFresh ? `<button onclick="requestNewReport('${child.id}')" style="width:100%;padding:11px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:13px;cursor:pointer">🔄 Raporu Güncelle</button>` : ""}
+          ` : `
+          <div style="text-align:center;padding:10px 0">
+            <div style="color:#9CA3AF;font-size:13px;margin-bottom:14px">${child.name} için henüz gelişim raporu oluşturulmadı.</div>
+            <button onclick="requestNewReport('${child.id}')" style="padding:12px 24px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;font-size:14px;cursor:pointer">✨ Raporu Oluştur</button>
+          </div>`}
         </div>
-        <div style="color:#374151;font-size:13px;line-height:1.7;white-space:pre-line">${lastReport.summary}</div>
-      </div>` : ""}
-
-      <!-- AI Rapor butonu -->
-      <button onclick="requestNewReport('${child.id}')"
-        style="width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#1A2E2A,#0D9B7E);color:white;font-weight:800;font-size:15px;cursor:pointer;box-shadow:0 4px 20px rgba(13,155,126,.3)">
-        ${reportBtnLabel}
-      </button>
+      </div>
 
     </div>
   </div>`);
+}
+
+function toggleReportAccordion(){
+  const body = document.getElementById("report-accordion-body");
+  const arrow = document.getElementById("accordion-arrow");
+  if(!body) return;
+  const isOpen = body.style.display !== "none";
+  body.style.display = isOpen ? "none" : "block";
+  if(arrow) arrow.style.transform = isOpen ? "" : "rotate(180deg)";
 }
 
 async function requestNewReport(childId){
