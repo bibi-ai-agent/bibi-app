@@ -2825,11 +2825,8 @@ async function startChat(child){
   }
 
   // Yeni oturum başlat
-  sb.from("sessions").insert({child_id:child.id,started_at:new Date().toISOString()}).select().single().then(({data,error})=>{
-    if(error) console.error("Session hatası:", JSON.stringify(error));
-    if(data){ sessionId=data.id; console.log("Session ID:", sessionId); }
-    else console.warn("Session data boş geldi");
-  });
+  // Session ilk mesaj gönderilince oluşturulacak (boş oturum kaydı önlenir)
+  sessionId = null;
   const openMsg = child.age<=8
     ? `Heyyyy ${child.name}! Bugün benimle ne öğrenmek istersin? 🎉`
     : child.age<=12
@@ -2927,11 +2924,14 @@ async function sendMessage(){
   addTyping();
   const topic = detectTopic(text);
   const homeworkMode = isHomeworkQuestion(text);
+  // Session yoksa ilk mesajda oluştur
+  if(!sessionId){
+    const {data:sess} = await sb.from("sessions").insert({child_id:currentChild.id,started_at:new Date().toISOString()}).select().single();
+    if(sess){ sessionId=sess.id; console.log("Session oluşturuldu:", sessionId); }
+  }
   if(sessionId){
     const {error:mErr} = await sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"user",content:text,topic,language:"tr"});
     if(mErr) console.error("Mesaj kayıt hatası:", JSON.stringify(mErr));
-  } else {
-    console.warn("sessionId yok, mesaj kaydedilemiyor");
   }
   updateMastery(currentChild.id, topic);
   // Duygu ve ilgi analizi — arka planda çalışır
@@ -2979,10 +2979,11 @@ async function loadHistory(){
   if(!listEl) return;
   listEl.innerHTML=`<div style="text-align:center;color:rgba(255,255,255,.3);font-size:13px;padding:30px 0">Yükleniyor...</div>`;
 
-  // Son 20 oturumu çek
+  // Son 20 oturumu çek — sadece mesajı olanları
   const {data:sessions} = await sb.from("sessions")
     .select("id,started_at,duration_mins,message_count")
     .eq("child_id", currentChild.id)
+    .gt("message_count", 0)  // Boş oturumları filtrele
     .order("started_at",{ascending:false})
     .limit(20);
 
@@ -2991,24 +2992,25 @@ async function loadHistory(){
     return;
   }
 
-  // Her oturum için ilk kullanıcı mesajını AYRI AYRI çek
-  const sessionTitles = {};
-  for(const s of sessions){
-    const {data:firstMsg} = await sb.from("messages")
-      .select("content")
-      .eq("session_id", s.id)
-      .eq("role","user")
-      .order("created_at",{ascending:true})
-      .limit(1)
-      .single();
-    sessionTitles[s.id] = firstMsg?.content || null;
-  }
+  const sessionIds = sessions.map(s=>s.id);
+
+  // TEK sorguda tüm ilk mesajları çek (N+1 yerine)
+  const {data:allFirstMsgs} = await sb.from("messages")
+    .select("session_id,content")
+    .in("session_id", sessionIds)
+    .eq("role","user")
+    .order("created_at",{ascending:true});
+
+  // Her session için ilk mesajı bul
+  const firstMsgMap = {};
+  (allFirstMsgs||[]).forEach(m=>{
+    if(!firstMsgMap[m.session_id]) firstMsgMap[m.session_id]=m.content;
+  });
 
   listEl.innerHTML = sessions.map((s,i)=>{
-    const raw = sessionTitles[s.id];
-    const title = raw
-      ? (raw.length>48 ? raw.slice(0,48)+"..." : raw)
-      : `Sohbet ${sessions.length - i}`;
+    const title = firstMsgMap[s.id]
+      ? (firstMsgMap[s.id].length>48 ? firstMsgMap[s.id].slice(0,48)+"..." : firstMsgMap[s.id])
+      : `Sohbet ${i+1}`;
     const date = new Date(s.started_at);
     const dateStr = date.toLocaleDateString("tr-TR",{day:"numeric",month:"short"});
     const timeStr = date.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
