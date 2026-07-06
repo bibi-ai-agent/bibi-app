@@ -2143,6 +2143,8 @@ async function resetPin(){
 
 async function screenPinLock(child){
   if(typeof child==="string") child=JSON.parse(child);
+  pinTarget = child; // Global state'e kaydet
+  pinEntry = "";
 
   const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
   if(!parent?.pin){
@@ -2195,7 +2197,9 @@ function pinBackspace(){
 async function checkPin(){
   const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
   if(parent?.pin === pinEntry){
-    // PIN doğru — overlay göster, veri gelince render et
+    const child = pinTarget;
+    if(!child){ screenChildren(); return; }
+
     const overlay = document.createElement("div");
     overlay.style.cssText = "position:fixed;inset:0;background:linear-gradient(135deg,#1A2E2A,#243d38);z-index:999;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif";
     overlay.innerHTML = `
@@ -2209,7 +2213,6 @@ async function checkPin(){
       </div>`;
     document.body.appendChild(overlay);
 
-    // Progress animasyonu
     const steps = ["Oturumlar alınıyor...","Duygular analiz ediliyor...","Rapor oluşturuluyor..."];
     let step = 0;
     const timer = setInterval(()=>{
@@ -2220,12 +2223,13 @@ async function checkPin(){
       step++;
     }, 400);
 
-    await screenReport(pinTarget);
+    await screenReport(child);
     clearInterval(timer);
     const bar = document.getElementById("loading-bar");
     if(bar) bar.style.width = "100%";
     await new Promise(r=>setTimeout(r,200));
     overlay.remove();
+
   } else {
     const err = el("pin-err"); if(err) err.style.display="block";
     [0,1,2,3].forEach(i=>{ const d=el(`pin-dot-${i}`); if(d){d.style.background="transparent";d.style.borderColor="rgba(255,255,255,.3)";} });
