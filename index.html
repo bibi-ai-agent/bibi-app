@@ -2980,11 +2980,12 @@ async function loadHistory(){
   if(!listEl) return;
   listEl.innerHTML=`<div style="text-align:center;color:rgba(255,255,255,.3);font-size:13px;padding:30px 0">Yükleniyor...</div>`;
 
-  // Son 20 oturumu çek — sadece mesajı olanları
+  // Pinned + normal — pinned önce gelsin
   const {data:sessions} = await sb.from("sessions")
-    .select("id,started_at,duration_mins,message_count")
+    .select("id,started_at,duration_mins,message_count,pinned")
     .eq("child_id", currentChild.id)
-    .gt("message_count", 0)  // Boş oturumları filtrele
+    .gt("message_count", 0)
+    .order("pinned",{ascending:false})
     .order("started_at",{ascending:false})
     .limit(20);
 
@@ -2994,15 +2995,12 @@ async function loadHistory(){
   }
 
   const sessionIds = sessions.map(s=>s.id);
-
-  // TEK sorguda tüm ilk mesajları çek (N+1 yerine)
   const {data:allFirstMsgs} = await sb.from("messages")
     .select("session_id,content")
     .in("session_id", sessionIds)
     .eq("role","user")
     .order("created_at",{ascending:true});
 
-  // Her session için ilk mesajı bul
   const firstMsgMap = {};
   (allFirstMsgs||[]).forEach(m=>{
     if(!firstMsgMap[m.session_id]) firstMsgMap[m.session_id]=m.content;
@@ -3016,23 +3014,73 @@ async function loadHistory(){
     const dateStr = date.toLocaleDateString("tr-TR",{day:"numeric",month:"short"});
     const timeStr = date.toLocaleTimeString("tr-TR",{hour:"2-digit",minute:"2-digit"});
     const isActive = s.id === sessionId;
+    const isPinned = s.pinned;
+
     return `
-    <div onclick="loadSession('${s.id}')"
-      style="padding:12px 10px;border-radius:12px;margin-bottom:8px;cursor:pointer;
-        background:${isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.05)"};
-        border:1px solid ${isActive?"rgba(13,155,126,.4)":"rgba(255,255,255,.08)"};
-        transition:background .2s"
-      onmouseover="this.style.background='rgba(255,255,255,.1)'"
-      onmouseout="this.style.background='${isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.05)"}'">
-      <div style="color:white;font-size:13px;font-weight:700;line-height:1.45;margin-bottom:5px">${title}</div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="color:rgba(255,255,255,.35);font-size:11px">${dateStr} ${timeStr}</span>
-        ${s.duration_mins ? `<span style="color:#4ade80;font-size:11px;font-weight:600">${s.duration_mins} dk</span>` : ""}
-        ${s.message_count ? `<span style="color:rgba(255,255,255,.3);font-size:11px">${s.message_count} mesaj</span>` : ""}
+    <div style="position:relative;margin-bottom:8px">
+      <div onclick="loadSession('${s.id}')"
+        style="padding:12px 10px 12px 12px;border-radius:12px;cursor:pointer;
+          background:${isPinned?"rgba(245,158,11,.12)":isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.05)"};
+          border:1px solid ${isPinned?"rgba(245,158,11,.3)":isActive?"rgba(13,155,126,.4)":"rgba(255,255,255,.08)"};
+          transition:background .2s;padding-right:72px"
+        onmouseover="this.style.background='rgba(255,255,255,.1)'"
+        onmouseout="this.style.background='${isPinned?"rgba(245,158,11,.12)":isActive?"rgba(13,155,126,.2)":"rgba(255,255,255,.05)"}'">
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px">
+          ${isPinned?`<span style="font-size:11px">📌</span>`:""}
+          <span style="color:white;font-size:13px;font-weight:700;line-height:1.45">${title}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:rgba(255,255,255,.35);font-size:11px">${dateStr} ${timeStr}</span>
+          ${s.duration_mins ? `<span style="color:#4ade80;font-size:11px;font-weight:600">${s.duration_mins} dk</span>` : ""}
+          ${s.message_count ? `<span style="color:rgba(255,255,255,.3);font-size:11px">${s.message_count} mesaj</span>` : ""}
+        </div>
+      </div>
+
+      <!-- Aksiyon butonları -->
+      <div style="position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:4px">
+        <button onclick="event.stopPropagation();togglePinSession('${s.id}',${isPinned})"
+          style="width:26px;height:26px;border-radius:8px;border:none;background:${isPinned?"rgba(245,158,11,.3)":"rgba(255,255,255,.1)"};cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center"
+          title="${isPinned?"Sabitliği Kaldır":"Sabitle"}">
+          📌
+        </button>
+        <button onclick="event.stopPropagation();deleteSession('${s.id}')"
+          style="width:26px;height:26px;border-radius:8px;border:none;background:rgba(244,132,95,.15);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center"
+          title="Sil">
+          🗑️
+        </button>
       </div>
     </div>`;
   }).join("");
 }
+
+async function togglePinSession(sid, isPinned){
+  await sb.from("sessions").update({pinned: !isPinned}).eq("id", sid);
+  loadHistory(); // Listeyi yenile
+}
+
+async function deleteSession(sid){
+  if(!confirm("Bu sohbeti silmek istediğine emin misin?")) return;
+
+  // Aktif oturumsa sıfırla
+  if(sid === sessionId){
+    sessionId = null;
+    messages = [];
+    const msgsEl = el("messages");
+    if(msgsEl) msgsEl.innerHTML = "";
+    const qp = el("quick-prompts"); if(qp) qp.style.display="flex";
+    addMsg("bibi", currentChild.age<=8
+      ? `Heyyyy ${currentChild.name}! Yeni bir sohbet başlayalım! 🎉`
+      : currentChild.age<=12
+      ? `Merhaba ${currentChild.name}! Yeni bir sohbet başlayalım.`
+      : `Selam ${currentChild.name}. Yeni bir sohbet başlayalım.`);
+  }
+
+  // Mesajları ve session'ı sil
+  await sb.from("messages").delete().eq("session_id", sid);
+  await sb.from("sessions").delete().eq("id", sid);
+  loadHistory(); // Listeyi yenile
+}
+
 
 async function loadSession(sid){
   toggleHistory();
