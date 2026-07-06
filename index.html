@@ -2271,15 +2271,19 @@ async function generateAndShowReport(childId){
 async function screenReport(child){
   if(typeof child==="string") child=JSON.parse(child);
 
-  // TEK RPC çağrısı — tüm veri bir anda gelir
-  const {data:reportData, error} = await sb.rpc("get_child_report", {p_child_id: child.id});
-  
-  if(error) console.error("Rapor RPC hatası:", error);
+  const [
+    {data:mastery=[]},
+    {data:sessions=[]},
+    {data:emotions=[]},
+    {data:weeklyReports=[]}
+  ] = await Promise.all([
+    sb.from("mastery").select("topic,score,message_count").eq("child_id",child.id).order("score",{ascending:false}).limit(8),
+    sb.from("sessions").select("started_at,duration_mins,message_count").eq("child_id",child.id).order("started_at",{ascending:false}).limit(5),
+    sb.from("emotion_logs").select("emotion,interest_area,character_hint").eq("child_id",child.id).order("created_at",{ascending:false}).limit(30),
+    sb.from("weekly_reports").select("summary,created_at,dominant_emotion,top_interests").eq("child_id",child.id).order("created_at",{ascending:false}).limit(1)
+  ]);
 
-  const mastery = reportData?.mastery || [];
-  const sessions = reportData?.sessions || [];
-  const emotions = reportData?.emotions || [];
-  const lastReport = reportData?.report || null;
+  const lastReport = weeklyReports[0] || null;
 
   const totalMinutes = sessions.reduce((s,x)=>s+(x.duration_mins||0),0);
   const totalMessages = sessions.reduce((s,x)=>s+(x.message_count||0),0);
