@@ -3482,6 +3482,7 @@ function askPinToGoBack(){
         <button onclick="backPinBackspace()" style="aspect-ratio:1;border-radius:50%;border:none;background:transparent;color:rgba(255,255,255,.5);font-size:16px;cursor:pointer">⌫</button>
       </div>
       <button onclick="closeBackPin()" style="width:100%;padding:10px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:700;cursor:pointer">İptal — Bibi'ye dön</button>
+      <button onclick="closeBackPin();showForgotPin()" style="background:none;border:none;color:rgba(255,255,255,.25);font-size:12px;cursor:pointer;margin-top:8px;text-decoration:underline;width:100%;text-align:center">PIN'imi unuttum</button>
     </div>`;
   document.body.appendChild(overlay);
   backPinEntry = "";
