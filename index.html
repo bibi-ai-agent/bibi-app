@@ -74,7 +74,7 @@ const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
 const GEMINI_KEY = "AQ.Ab8RN6IhIPSjXieXn4z3z_wq8P2up2P_CSgW-_mFaoapFK8QnQ";
-const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 // Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
 async function callAI(systemPrompt, messages, maxTokens=1000){
@@ -105,7 +105,10 @@ async function callAI(systemPrompt, messages, maxTokens=1000){
 
   const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`,{
     method:"POST",
-    headers:{"Content-Type":"application/json"},
+    headers:{
+      "Content-Type":"application/json",
+      "x-goog-api-key": GEMINI_KEY
+    },
     body:JSON.stringify({
       contents,
       generationConfig:{
