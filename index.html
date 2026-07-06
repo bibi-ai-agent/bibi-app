@@ -2327,7 +2327,7 @@ async function screenReport(child){
   const balanceScore = totalEmotions > 0 ? Math.round(positiveCount/totalEmotions*100) : null;
 
   render(`
-  <div style="min-height:100vh;background:linear-gradient(160deg,#0d0118 0%,#1a0533 25%,#2d0a3e 45%,#4a0e2e 65%,#5c1a38 80%,#1a0533 100%);background-size:300% 300%;animation:gradShift 28s ease infinite;position:relative;overflow:hidden">
+  <div style="min-height:100vh;background:linear-gradient(160deg,#a8607a 0%,#b87fa0 18%,#8f6aaa 35%,#7a8cc0 52%,#7ab5c8 68%,#8fbfa8 82%,#a8607a 100%);background-size:300% 300%;animation:gradShift 22s ease infinite;position:relative;overflow:hidden">
 
     <!-- Hareketli veli soruları arka planda -->
     <div style="position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden">
@@ -2358,7 +2358,7 @@ async function screenReport(child){
     </div>
 
     <!-- Header — sticky, güvenli bölge -->
-    <div style="background:rgba(26,5,51,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid rgba(255,255,255,.1);padding:18px 20px;position:sticky;top:0;z-index:10">
+    <div style="background:rgba(80,30,60,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:1.5px solid rgba(255,255,255,.15);padding:18px 20px;position:sticky;top:0;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.3)">
       <div style="max-width:520px;margin:0 auto;display:flex;align-items:center;justify-content:space-between">
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.25);background:#0D9B7E;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">${avatarHtml}</div>
@@ -2376,17 +2376,17 @@ async function screenReport(child){
 
       <!-- 3 stat kartı -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:16px 8px;text-align:center">
+        <div style="background:rgba(255,255,255,.18);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.3);border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.15)">
           <div style="font-size:22px">⏱️</div>
           <div style="font-size:22px;font-weight:900;color:#60a5fa;margin-top:4px">${totalMinutes}</div>
           <div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:700;margin-top:2px">Dakika</div>
         </div>
-        <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:16px 8px;text-align:center">
+        <div style="background:rgba(255,255,255,.18);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.3);border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.15)">
           <div style="font-size:22px">💬</div>
           <div style="font-size:22px;font-weight:900;color:#4ade80;margin-top:4px">${totalMessages}</div>
           <div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:700;margin-top:2px">Mesaj</div>
         </div>
-        <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:16px 8px;text-align:center">
+        <div style="background:rgba(255,255,255,.18);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.3);border-radius:16px;padding:16px 8px;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.15)">
           <div style="font-size:22px">📖</div>
           <div style="font-size:22px;font-weight:900;color:#a78bfa;margin-top:4px">${totalSessions}</div>
           <div style="font-size:10px;color:rgba(255,255,255,.45);font-weight:700;margin-top:2px">Sohbet</div>
@@ -2395,8 +2395,8 @@ async function screenReport(child){
 
       <!-- Duygusal Denge Skoru -->
       ${balanceScore !== null ? `
-      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:18px;margin-bottom:14px">
-        <div style="font-size:14px;font-weight:800;color:white;margin-bottom:14px">💙 Duygusal Denge Skoru</div>
+      <div style="background:rgba(255,255,255,.15);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
+        <div style="font-size:14px;font-weight:800;color:white;margin-bottom:14px;text-shadow:0 1px 4px rgba(0,0,0,.3)">💙 Duygusal Denge Skoru</div>
         <div style="display:flex;align-items:center;gap:16px">
           <div style="position:relative;width:80px;height:80px;flex-shrink:0">
             <svg width="80" height="80" viewBox="0 0 80 80">
@@ -2434,7 +2434,7 @@ async function screenReport(child){
 
       <!-- İlgi Alanları -->
       ${topInterests.length>0 ? `
-      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:18px;margin-bottom:14px">
+      <div style="background:rgba(255,255,255,.15);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
         <div style="font-size:14px;font-weight:800;color:white;margin-bottom:14px">⭐ İlgi Alanları</div>
         ${topInterests.map(([area,count])=>{
           const pct=Math.round(count/totalEmotions*100);
@@ -2452,10 +2452,10 @@ async function screenReport(child){
 
       <!-- Karakter Gözlemleri -->
       ${charHints.length>0 ? `
-      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:18px;margin-bottom:14px">
+      <div style="background:rgba(255,255,255,.15);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
         <div style="font-size:14px;font-weight:800;color:white;margin-bottom:12px">🧠 Karakter Gözlemleri</div>
         ${[...new Set(charHints)].slice(0,4).map(h=>`
-        <div style="display:flex;gap:8px;padding:10px 12px;background:rgba(13,155,126,.1);border-radius:10px;border-left:3px solid #0D9B7E;margin-bottom:8px">
+        <div style="display:flex;gap:8px;padding:10px 12px;background:rgba(255,255,255,.12);border-radius:10px;border-left:3px solid rgba(255,255,255,.5);margin-bottom:8px">
           <span>💙</span>
           <span style="font-size:13px;color:rgba(255,255,255,.8);line-height:1.5">${h}</span>
         </div>`).join("")}
@@ -2463,7 +2463,7 @@ async function screenReport(child){
 
       <!-- Akademik Ustalık -->
       ${mastery.length>0 ? `
-      <div style="background:rgba(255,255,255,.06);backdrop-filter:blur(16px);border:1px solid rgba(180,80,120,.2);border-radius:16px;padding:18px;margin-bottom:14px">
+      <div style="background:rgba(255,255,255,.15);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
         <div style="font-size:14px;font-weight:800;color:white;margin-bottom:14px">📊 Akademik Ustalık</div>
         ${mastery.map(m=>`
         <div style="margin-bottom:14px">
@@ -2505,9 +2505,9 @@ async function screenReport(child){
       </div>` : ""}
 
       <!-- Gelişim Raporu Accordion -->
-      <div style="background:rgba(255,255,255,.07);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:16px;overflow:hidden;margin-bottom:12px">
+      <div style="background:rgba(255,255,255,.15);backdrop-filter:blur(20px);border:1.5px solid rgba(255,255,255,.25);border-radius:16px;overflow:hidden;margin-bottom:12px;box-shadow:0 4px 16px rgba(0,0,0,.12)">
         <button onclick="toggleReportAccordion()" id="report-accordion-btn"
-          style="width:100%;padding:16px 18px;border:none;background:transparent;color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left;box-sizing:border-box">
+          style="width:100%;padding:16px 18px;border:none;background:rgba(0,0,0,.1);color:white;cursor:pointer;display:flex;align-items:center;justify-content:space-between;text-align:left;box-sizing:border-box">
           <div style="display:flex;align-items:center;gap:10px">
             <span style="font-size:18px">✨</span>
             <div>
