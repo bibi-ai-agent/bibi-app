@@ -73,6 +73,54 @@
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
+const GEMINI_KEY = "AQ.Ab8RN6JAJzDW03CE6nWpB0pvTVn1kHHXQSQkBFGn1N2haHEzDw";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+
+// Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
+async function callAI(systemPrompt, messages, maxTokens=1000){
+  // Gemini formatına çevir
+  const contents = [];
+  
+  // System prompt'u ilk user mesajına ekle
+  const allMessages = messages || [];
+  
+  for(let i=0; i<allMessages.length; i++){
+    const m = allMessages[i];
+    const role = m.role === "assistant" ? "model" : "user";
+    // System prompt sadece ilk mesajın başına eklenir
+    const text = (i===0 && systemPrompt) ? `${systemPrompt}\n\n${m.content}` : m.content;
+    
+    // Gemini art arda aynı role istemez — birleştir
+    if(contents.length>0 && contents[contents.length-1].role===role){
+      contents[contents.length-1].parts[0].text += "\n" + text;
+    } else {
+      contents.push({role, parts:[{text}]});
+    }
+  }
+  
+  // Eğer hiç mesaj yoksa system prompt'u gönder
+  if(contents.length===0 && systemPrompt){
+    contents.push({role:"user", parts:[{text:systemPrompt}]});
+  }
+
+  const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      contents,
+      generationConfig:{
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,
+      }
+    })
+  });
+  
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error?.message || "Gemini API hatası");
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+
 const ELEVENLABS_KEY = "sk_41588dc49a5f53e0da60804f8b4565d5efa63c883ef2853c";
 
 // ElevenLabs sesleri — 2 kadın, 2 erkek
@@ -1042,13 +1090,7 @@ KURALLAR:
   ];
 
   try{
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
-      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"system",content:systemPrompt},...apiMessages],max_tokens:800})
-    });
-    const data = await res.json();
-    const reply = data.choices?.[0]?.message?.content || "Bir sorun oluştu 🙈";
+    const reply = await callAI(systemPrompt, apiMessages, 800);
     const t=document.getElementById("proj-typing"); if(t) t.remove();
     addProjectMsg("bibi", reply);
     state.messages.push({role:"user",content:userText},{role:"assistant",content:reply});
@@ -1102,13 +1144,7 @@ SADECE JSON yanıt ver:
 {"emotion":"...","interest_area":"...","confidence":85,"character_hint":"...","engagement":"..."}`;
 
   try{
-    const res = await fetch(OPENROUTER_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app"},
-      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:prompt}],max_tokens:200})
-    });
-    const data = await res.json();
-    let raw = data.choices?.[0]?.message?.content||"{}";
+    let raw = await callAI(null, [{role:"user",content:prompt}], 200);
     raw = raw.replace(/```json|```/g,"").trim();
     const parsed = JSON.parse(raw);
 
@@ -1179,13 +1215,7 @@ Raporu şu başlıklar altında yaz (Türkçe, veliye hitap ederek, samimi ve de
 
 ÖNEMLİ: Hiçbir zaman "kazandı/kaybetti" veya başka çocuklarla kıyaslama yapma. Sadece ${child.name}'in kendine özgü gelişimini anlat.`;
 
-  const res = await fetch(OPENROUTER_URL,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app"},
-    body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:reportPrompt}],max_tokens:1500})
-  });
-  const data = await res.json();
-  const summary = data.choices?.[0]?.message?.content||"Rapor üretilemedi.";
+  const summary = await callAI(null, [{role:"user",content:reportPrompt}], 1500);
 
   // Kaydet
   await sb.from("weekly_reports").upsert({
@@ -1282,13 +1312,7 @@ SADECE aşağıdaki JSON formatında yanıt ver, başka hiçbir şey yazma:
 }`;
 
   try{
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions",{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
-      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"user",content:prompt}],max_tokens:2000})
-    });
-    const data = await res.json();
-    let text = data.choices?.[0]?.message?.content||"";
+    let text = await callAI(null, [{role:"user",content:prompt}], 2000);
     text = text.replace(/```json|```/g,"").trim();
     const parsed = JSON.parse(text);
     return parsed.questions;
@@ -2937,17 +2961,12 @@ async function sendMessage(){
   // Duygu ve ilgi analizi — arka planda çalışır
   analyzeEmotionAndInterest(currentChild.id, sessionId, text);
   try{
-    const res=await fetch(OPENROUTER_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json","Authorization":`Bearer ${OPENROUTER_KEY}`,"HTTP-Referer":"https://bibi-app-rho.vercel.app","X-Title":"Bibi"},
-      body:JSON.stringify({model:"openrouter/auto",messages:[{role:"system",content:buildPrompt(currentChild)},...messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}))],max_tokens:1000})
-    });
-    const data=await res.json();
-    const reply=data.choices?.[0]?.message?.content||data.error?.message||"Bir sorun oluştu 🙈";
+    const chatMsgs = messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}));
+    const reply = await callAI(buildPrompt(currentChild), chatMsgs, 1000);
     removeTyping();
     setExpr("happy"); setStatus("Seninle burada!","#4ade80");
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("happy",44);
-    addMsg("bibi",reply);
+    addMsg("bibi",reply||"Bir sorun oluştu 🙈");
     // speak(reply); — otomatik ses kapalı, kullanıcı ▶ butonuna basarsa çalar
     setTimeout(()=>{ setExpr("idle"); const w=el("bibi-face-wrap"); if(w) w.innerHTML=bibiFaceSVG("idle",44); },3000);
     if(sessionId){
