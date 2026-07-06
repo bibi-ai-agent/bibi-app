@@ -2989,8 +2989,37 @@ async function saveAvatarEmoji(emoji, childId){
 
 
 
-function showAddForm(){ el("add-form").classList.remove("hidden"); el("show-add-btn").classList.add("hidden"); }
-function hideAddForm(){ el("add-form").classList.add("hidden"); el("show-add-btn").classList.remove("hidden"); }
+function showAddForm(){
+  const form = el("add-form");
+  const btn = el("show-add-btn");
+  if(!form||!btn) return;
+  form.classList.remove("hidden");
+  btn.classList.add("hidden");
+
+  // Dışarı tıklayınca kapat
+  setTimeout(()=>{
+    document.addEventListener("click", _outsideAddFormHandler);
+  }, 100);
+}
+
+function _outsideAddFormHandler(e){
+  const form = el("add-form");
+  if(form && !form.contains(e.target)){
+    hideAddForm();
+    document.removeEventListener("click", _outsideAddFormHandler);
+  }
+}
+
+function hideAddForm(){
+  const form = el("add-form");
+  const btn = el("show-add-btn");
+  if(!form||!btn) return;
+  form.classList.add("hidden");
+  btn.classList.remove("hidden");
+  document.removeEventListener("click", _outsideAddFormHandler);
+  // Formu sıfırla
+  newGender=""; newAvatarData=""; newAvatarType="";
+}
 
 async function addChild(){
   const name=el("new-name")?.value.trim(), age=el("new-age")?.value, grade=el("new-grade")?.value;
