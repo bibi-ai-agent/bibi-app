@@ -73,54 +73,33 @@
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
-const GEMINI_KEY = "AQ.Ab8RN6IhIPSjXieXn4z3z_wq8P2up2P_CSgW-_mFaoapFK8QnQ";
+const GROQ_KEY = "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";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 
 // Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
 async function callAI(systemPrompt, messages, maxTokens=1000){
-  // Gemini formatına çevir
-  const contents = [];
-  
-  // System prompt'u ilk user mesajına ekle
-  const allMessages = messages || [];
-  
-  for(let i=0; i<allMessages.length; i++){
-    const m = allMessages[i];
-    const role = m.role === "assistant" ? "model" : "user";
-    // System prompt sadece ilk mesajın başına eklenir
-    const text = (i===0 && systemPrompt) ? `${systemPrompt}\n\n${m.content}` : m.content;
-    
-    // Gemini art arda aynı role istemez — birleştir
-    if(contents.length>0 && contents[contents.length-1].role===role){
-      contents[contents.length-1].parts[0].text += "\n" + text;
-    } else {
-      contents.push({role, parts:[{text}]});
-    }
-  }
-  
-  // Eğer hiç mesaj yoksa system prompt'u gönder
-  if(contents.length===0 && systemPrompt){
-    contents.push({role:"user", parts:[{text:systemPrompt}]});
-  }
+  const apiMessages = [];
+  if(systemPrompt) apiMessages.push({role:"system", content:systemPrompt});
+  (messages||[]).forEach(m => apiMessages.push({role: m.role||"user", content: m.content}));
 
-  const res = await fetch(`${GEMINI_URL}?key=${GEMINI_KEY}`,{
+  const res = await fetch(GROQ_URL, {
     method:"POST",
     headers:{
       "Content-Type":"application/json",
-      "x-goog-api-key": GEMINI_KEY
+      "Authorization": `Bearer ${GROQ_KEY}`
     },
-    body:JSON.stringify({
-      contents,
-      generationConfig:{
-        maxOutputTokens: maxTokens,
-        temperature: 0.7,
-      }
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages: apiMessages,
+      max_tokens: maxTokens,
+      temperature: 0.7
     })
   });
-  
+
   const data = await res.json();
-  if(!res.ok) throw new Error(data.error?.message || "Gemini API hatası");
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if(!res.ok) throw new Error(data.error?.message || "Groq API hatası");
+  return data.choices?.[0]?.message?.content || "";
 }
 
 
