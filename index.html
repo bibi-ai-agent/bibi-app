@@ -1646,6 +1646,7 @@ function screenAuth(){
           </div>
           <div id="login-msg" style="display:none;padding:10px 14px;border-radius:10px;font-size:13px;margin-top:12px"></div>
           <button onclick="doLogin()" id="login-btn" class="btn-primary" style="margin-top:16px">Giriş Yap →</button>
+          <button onclick="showForgotPassword()" style="background:none;border:none;color:rgba(255,255,255,.4);font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;text-decoration:underline">Şifremi Unuttum</button>
         </div>
 
         <!-- Register step 1: account -->
@@ -2046,9 +2047,103 @@ async function setPinNext(){
 // ── PIN Kilidi (Çocuk raporlara erişemesin) ───────────────────
 let pinTarget = null, pinEntry = "";
 
+// ── Şifre & PIN Sıfırlama ─────────────────────────────────────
+function showForgotPassword(){
+  const overlay = document.createElement("div");
+  overlay.id = "forgot-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Nunito',sans-serif";
+  overlay.innerHTML = `
+    <div style="background:#1A2E2A;border:1.5px solid rgba(255,255,255,.15);border-radius:20px;padding:28px 24px;width:100%;max-width:320px;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">🔑</div>
+      <div style="color:white;font-size:17px;font-weight:900;margin-bottom:8px">Şifre Sıfırlama</div>
+      <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:20px">E-posta adresinize şifre sıfırlama bağlantısı gönderilecek</div>
+      <input id="forgot-email" type="email" placeholder="E-posta adresiniz" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:white;font-size:14px;font-family:'Nunito',sans-serif;box-sizing:border-box;margin-bottom:12px"/>
+      <div id="forgot-msg" style="display:none;font-size:12px;margin-bottom:12px;padding:8px;border-radius:8px"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('forgot-overlay').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">İptal</button>
+        <button onclick="sendResetEmail()" style="flex:2;padding:11px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer">Bağlantı Gönder</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function sendResetEmail(){
+  const email = document.getElementById("forgot-email")?.value.trim();
+  const msg = document.getElementById("forgot-msg");
+  if(!email){ return; }
+
+  const {error} = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin
+  });
+
+  if(error){
+    msg.style.display="block"; msg.style.background="rgba(244,132,95,.15)"; msg.style.color="#fca88a";
+    msg.textContent = "Hata: " + error.message;
+  } else {
+    msg.style.display="block"; msg.style.background="rgba(13,155,126,.15)"; msg.style.color="#4ade80";
+    msg.textContent = "✅ E-posta gönderildi! Gelen kutunuzu kontrol edin.";
+    setTimeout(()=>{ document.getElementById("forgot-overlay")?.remove(); }, 3000);
+  }
+}
+
+function showForgotPin(){
+  const overlay = document.createElement("div");
+  overlay.id = "forgot-pin-overlay";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;font-family:'Nunito',sans-serif";
+  overlay.innerHTML = `
+    <div style="background:#1A2E2A;border:1.5px solid rgba(255,255,255,.15);border-radius:20px;padding:28px 24px;width:100%;max-width:320px;text-align:center">
+      <div style="font-size:36px;margin-bottom:12px">📱</div>
+      <div style="color:white;font-size:17px;font-weight:900;margin-bottom:8px">PIN Sıfırlama</div>
+      <div style="color:rgba(255,255,255,.5);font-size:13px;margin-bottom:20px">Giriş şifrenizi doğrulayın, ardından yeni PIN belirleyin</div>
+      <input id="pin-reset-pw" type="password" placeholder="Giriş şifreniz" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:white;font-size:14px;font-family:'Nunito',sans-serif;box-sizing:border-box;margin-bottom:8px"/>
+      <input id="pin-reset-new" type="number" placeholder="Yeni 4 haneli PIN" maxlength="4" style="width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:white;font-size:14px;font-family:'Nunito',sans-serif;box-sizing:border-box;margin-bottom:12px" oninput="if(this.value.length>4)this.value=this.value.slice(0,4)"/>
+      <div id="pin-reset-msg" style="display:none;font-size:12px;margin-bottom:12px;padding:8px;border-radius:8px"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('forgot-pin-overlay').remove()" style="flex:1;padding:11px;border-radius:12px;border:1.5px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);font-weight:700;cursor:pointer">İptal</button>
+        <button onclick="resetPin()" style="flex:2;padding:11px;border-radius:12px;border:none;background:#0D9B7E;color:white;font-weight:800;cursor:pointer">PIN'i Sıfırla</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function resetPin(){
+  const pw = document.getElementById("pin-reset-pw")?.value;
+  const newPin = document.getElementById("pin-reset-new")?.value;
+  const msg = document.getElementById("pin-reset-msg");
+
+  if(!pw || !newPin || newPin.length!==4){
+    msg.style.display="block"; msg.style.background="rgba(244,132,95,.15)"; msg.style.color="#fca88a";
+    msg.textContent = "Şifre ve 4 haneli yeni PIN giriniz."; return;
+  }
+
+  // Giriş şifresiyle doğrula
+  const email = currentUser?.email;
+  if(!email){
+    msg.style.display="block"; msg.style.color="#fca88a";
+    msg.textContent = "Oturum bulunamadı."; return;
+  }
+
+  const {error:authErr} = await sb.auth.signInWithPassword({email, password:pw});
+  if(authErr){
+    msg.style.display="block"; msg.style.background="rgba(244,132,95,.15)"; msg.style.color="#fca88a";
+    msg.textContent = "Şifre yanlış, tekrar deneyin."; return;
+  }
+
+  // PIN güncelle
+  const {error} = await sb.from("parents").update({pin:newPin}).eq("id",currentUser.id);
+  if(error){
+    msg.style.display="block"; msg.style.color="#fca88a";
+    msg.textContent = "Hata oluştu: "+error.message; return;
+  }
+
+  msg.style.display="block"; msg.style.background="rgba(13,155,126,.15)"; msg.style.color="#4ade80";
+  msg.textContent = "✅ PIN başarıyla güncellendi!";
+  setTimeout(()=>{ document.getElementById("forgot-pin-overlay")?.remove(); screenChildren(); }, 2000);
+}
+
+
 async function screenPinLock(child){
   if(typeof child==="string") child=JSON.parse(child);
-  pinTarget = child; pinEntry = "";
 
   const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
   if(!parent?.pin){
@@ -2078,6 +2173,7 @@ async function screenPinLock(child){
       </div>
 
       <button onclick="screenChildren()" style="margin-top:24px;background:transparent;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer">← Vazgeç</button>
+      <button onclick="showForgotPin()" style="background:none;border:none;color:rgba(255,255,255,.25);font-size:12px;cursor:pointer;margin-top:8px;text-decoration:underline">PIN'imi unuttum</button>
     </div>
   </div>`);
 }
