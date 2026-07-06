@@ -2100,7 +2100,18 @@ function pinBackspace(){
 async function checkPin(){
   const {data:parent} = await sb.from("parents").select("pin").eq("id",currentUser.id).single();
   if(parent?.pin === pinEntry){
-    screenReport(pinTarget);
+    // PIN doğru — overlay göster, veri gelince render et
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(26,46,42,.95);z-index:999;display:flex;align-items:center;justify-content:center;font-family:'Nunito',sans-serif";
+    overlay.innerHTML = `
+      <div style="text-align:center">
+        ${bibiFaceSVG("thinking",64)}
+        <div style="color:rgba(255,255,255,.6);font-size:14px;font-weight:600;margin-top:14px">Rapor yükleniyor...</div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    await screenReport(pinTarget);
+    overlay.remove();
   } else {
     const err = el("pin-err"); if(err) err.style.display="block";
     [0,1,2,3].forEach(i=>{ const d=el(`pin-dot-${i}`); if(d){d.style.background="transparent";d.style.borderColor="rgba(255,255,255,.3)";} });
