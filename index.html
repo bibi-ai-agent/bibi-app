@@ -3671,7 +3671,47 @@ function showNotif(msg){
 }
 
 
-// ── Yaşa göre görsel stili ────────────────────────────────────
+// ── + Aksiyon Menüsü ──────────────────────────────────────────
+function toggleActionMenu(){
+  const menu = document.getElementById("action-menu");
+  const btn = document.getElementById("action-btn");
+  if(!menu) return;
+  const isOpen = menu.style.display !== "none";
+  menu.style.display = isOpen ? "none" : "block";
+  btn.style.background = isOpen ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.25)";
+  btn.textContent = isOpen ? "+" : "✕";
+  if(!isOpen){
+    setTimeout(()=>document.addEventListener("click", _closeMenuOutside), 100);
+  }
+}
+
+function _closeMenuOutside(e){
+  const menu = document.getElementById("action-menu");
+  const btn = document.getElementById("action-btn");
+  if(menu && !menu.contains(e.target) && e.target !== btn){
+    closeActionMenu();
+    document.removeEventListener("click", _closeMenuOutside);
+  }
+}
+
+function closeActionMenu(){
+  const menu = document.getElementById("action-menu");
+  const btn = document.getElementById("action-btn");
+  if(menu) menu.style.display = "none";
+  if(btn){ btn.style.background="rgba(255,255,255,.12)"; btn.textContent="+"; }
+  document.removeEventListener("click", _closeMenuOutside);
+}
+
+function addImageRequest(){
+  const inp = document.getElementById("chat-input");
+  if(inp){
+    inp.value = "Bana bir görsel çiz: ";
+    inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+  }
+}
+
+
 function getImageStyle(age){
   if(age<=8) return "cartoon style, cute, colorful, simple, children's book illustration, bright colors, friendly characters";
   if(age<=12) return "colorful illustration, semi-realistic, educational style, vibrant, detailed, middle grade";
