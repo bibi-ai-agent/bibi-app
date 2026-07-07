@@ -146,7 +146,13 @@ let isListening = false, recognition = null;
 // HELPERS
 // ══════════════════════════════════════════════════════════════
 const R = document.getElementById("root");
-function render(html){ R.innerHTML = html; }
+function render(html){
+  // Ekran değişince açık kalan bildirimleri temizle
+  ["pres-notif","content-creator-modal","voice-selector-modal","crop-modal","forgot-overlay","forgot-pin-overlay"].forEach(id=>{
+    document.getElementById(id)?.remove();
+  });
+  R.innerHTML = html;
+}
 
 function el(id){ return document.getElementById(id); }
 
