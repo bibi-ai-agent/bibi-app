@@ -77,6 +77,8 @@ const OPENROUTER_KEY = "sk-or-v1-56df032fd8cfd9dea3b2e18bee18e13dd139b77efb9e537
 const GROQ_KEY = "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";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
+const HF_KEY = "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";
+const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0";
 
 // Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
 async function callAI(systemPrompt, messages, maxTokens=1000){
@@ -3137,6 +3139,9 @@ async function startChat(child){
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><rect x="9" y="2" width="6" height="11" rx="3" fill="white"/><path d="M5 11a7 7 0 0 0 14 0" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="22" x2="15" y2="22" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
         </button>
         <input id="chat-input" placeholder="Bibi'ye yaz veya konuş..." onkeydown="if(event.key==='Enter')sendMessage()" style="flex:1;padding:13px 18px;border-radius:28px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.1);font-size:15px;color:white;font-family:'Nunito',sans-serif;backdrop-filter:blur(8px)"/>
+        <button onclick="exportChatPDF()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0" title="PDF İndir">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="white" stroke-width="2" stroke-linecap="round"/><polyline points="14,2 14,8 20,8" stroke="white" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="18" x2="12" y2="12" stroke="white" stroke-width="2" stroke-linecap="round"/><polyline points="9,15 12,18 15,15" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
         <button id="send-btn" onclick="sendMessage()" style="width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.22);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M22 2L11 13" stroke="white" stroke-width="2.5" stroke-linecap="round"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
@@ -3291,6 +3296,8 @@ async function sendMessage(){
   addTyping();
   const topic = detectTopic(text);
   const homeworkMode = isHomeworkQuestion(text);
+  const imageRequest = detectImageRequest(text);
+
   // Session yoksa ilk mesajda oluştur
   if(!sessionId){
     const {data:sess} = await sb.from("sessions").insert({child_id:currentChild.id,started_at:new Date().toISOString()}).select().single();
@@ -3301,8 +3308,13 @@ async function sendMessage(){
     if(mErr) console.error("Mesaj kayıt hatası:", JSON.stringify(mErr));
   }
   updateMastery(currentChild.id, topic);
-  // Duygu ve ilgi analizi — arka planda çalışır
   analyzeEmotionAndInterest(currentChild.id, sessionId, text);
+
+  // Görsel isteği varsa ayrıca görsel üret
+  if(imageRequest){
+    addImageToChat(text);
+  }
+
   try{
     const chatMsgs = messages.map(m=>({role:m.r==="bibi"?"assistant":"user",content:m.t}));
     const reply = await callAI(buildPrompt(currentChild), chatMsgs, 1000);
@@ -3582,7 +3594,189 @@ async function goBack(){
 }
 
 // ── VOICE ─────────────────────────────────────────────────────
-// ── Ses sistemi (ElevenLabs TTS) ─────────────────────────────
+// ── Görsel Üretme (Hugging Face) ─────────────────────────────
+async function generateImage(prompt){
+  // Türkçe promptu İngilizce'ye çevir (HF modeli İngilizce daha iyi)
+  const translateRes = await callAI(null, [{role:"user", content:`Translate this to English for an image generation prompt, keep it simple and child-friendly, max 20 words: "${prompt}"`}], 100);
+  const englishPrompt = translateRes?.trim() || prompt;
+  const safePrompt = `${englishPrompt}, children's illustration style, colorful, cute, safe for kids, cartoon`;
+
+  try{
+    const res = await fetch(HF_MODEL, {
+      method:"POST",
+      headers:{
+        "Authorization": `Bearer ${HF_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        inputs: safePrompt,
+        parameters: { num_inference_steps: 20, guidance_scale: 7.5 }
+      })
+    });
+
+    if(!res.ok){
+      const err = await res.text();
+      // Model yükleniyor olabilir
+      if(res.status === 503) return "loading";
+      throw new Error(err);
+    }
+
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }catch(e){
+    console.error("Görsel üretme hatası:", e);
+    return null;
+  }
+}
+
+// Mesajda görsel isteği var mı?
+function detectImageRequest(text){
+  const keywords = ["çiz","resim yap","görsel yap","resim çiz","fotoğraf çek","illüstrasyon","draw","paint","picture of","image of","göster","çizim"];
+  return keywords.some(k => text.toLowerCase().includes(k));
+}
+
+// Görseli chat'e ekle
+async function addImageToChat(prompt){
+  const msgsEl = el("messages"); if(!msgsEl) return;
+
+  // Loading placeholder
+  const loadRow = document.createElement("div");
+  loadRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
+  loadRow.innerHTML = `
+    <div style="flex-shrink:0;width:36px;height:36px">${bibiFaceSVG("thinking",36)}</div>
+    <div style="padding:14px 18px;border-radius:4px 18px 18px 18px;background:rgba(255,255,255,.9);color:#1A2E2A;font-size:13px;display:flex;align-items:center;gap:8px">
+      <div style="display:flex;gap:4px">
+        ${[0,1,2].map(i=>`<div style="width:6px;height:6px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease ${i*.2}s infinite"></div>`).join("")}
+      </div>
+      Görsel hazırlanıyor...
+    </div>`;
+  msgsEl.appendChild(loadRow);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  const imgUrl = await generateImage(prompt);
+  loadRow.remove();
+
+  if(imgUrl === "loading"){
+    addMsg("bibi", "Model şu an yükleniyor, 20 saniye sonra tekrar dene! 🎨");
+    return;
+  }
+  if(!imgUrl){
+    addMsg("bibi", "Görseli üretemedi, tekrar dener misin? 🙈");
+    return;
+  }
+
+  // Görseli göster
+  const imgRow = document.createElement("div");
+  imgRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
+  imgRow.innerHTML = `
+    <div style="flex-shrink:0;width:36px;height:36px">${bibiFaceSVG("happy",36)}</div>
+    <div style="max-width:80%">
+      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px" alt="Bibi'nin çizimi"/>
+      <div style="display:flex;gap:8px">
+        <button onclick="downloadImage('${imgUrl}')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">⬇️ İndir</button>
+        <button onclick="addImageToPDF('${imgUrl}')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e ekle</button>
+      </div>
+    </div>`;
+  msgsEl.appendChild(imgRow);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+function downloadImage(url){
+  const a = document.createElement("a");
+  a.href = url; a.download = "bibi-gorseli.png"; a.click();
+}
+
+// PDF için görsel listesi
+let pdfImages = [];
+let pdfMessages = [];
+
+function addImageToPDF(url){
+  pdfImages.push(url);
+  const count = pdfImages.length;
+  // Küçük bildirim
+  const notif = document.createElement("div");
+  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease";
+  notif.textContent = `✅ PDF'e eklendi (${count} görsel)`;
+  document.body.appendChild(notif);
+  setTimeout(()=>notif.remove(), 2000);
+}
+
+
+// ── PDF Export ────────────────────────────────────────────────
+async function exportChatPDF(){
+  const child = currentChild;
+  if(!child || messages.length===0){ 
+    alert("PDF oluşturmak için önce Bibi ile konuş!"); 
+    return; 
+  }
+
+  // jsPDF CDN'den yükle
+  if(!window.jspdf){
+    const notif = document.createElement("div");
+    notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500";
+    notif.textContent = "📄 PDF hazırlanıyor...";
+    document.body.appendChild(notif);
+
+    await new Promise((resolve, reject)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+      s.onload = ()=>{ notif.remove(); resolve(); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:"portrait", unit:"mm", format:"a4" });
+  const pageW=210, pageH=297, margin=15;
+  let y = margin;
+
+  // Header
+  doc.setFillColor(13,155,126);
+  doc.rect(0,0,pageW,28,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(18); doc.setFont("helvetica","bold");
+  doc.text("Bibi ile Sohbet", margin, 16);
+  doc.setFontSize(9); doc.setFont("helvetica","normal");
+  doc.text(`${child.name} • ${new Date().toLocaleDateString("tr-TR",{day:"numeric",month:"long",year:"numeric"})}`, pageW-margin, 16, {align:"right"});
+  y = 38;
+
+  // Mesajlar
+  for(const msg of messages){
+    const isUser = msg.r==="user";
+    const label = isUser ? child.name : "Bibi";
+    const [r,g,b] = isUser ? [37,99,235] : [13,155,126];
+
+    if(y > pageH-margin){ doc.addPage(); y=margin; }
+    doc.setFontSize(9); doc.setFont("helvetica","bold");
+    doc.setTextColor(r,g,b);
+    doc.text(label+":", margin, y); y+=5;
+
+    doc.setFontSize(11); doc.setFont("helvetica","normal");
+    doc.setTextColor(30,30,30);
+    const lines = doc.splitTextToSize(msg.t, pageW-margin*2);
+    for(const line of lines){
+      if(y > pageH-margin){ doc.addPage(); y=margin; }
+      doc.text(line, margin, y); y+=6;
+    }
+    y+=4;
+  }
+
+  // Görseller
+  for(const imgUrl of pdfImages){
+    if(y > pageH-80){ doc.addPage(); y=margin; }
+    try{ doc.addImage(imgUrl,"PNG",margin,y,80,80); y+=85; }
+    catch(e){}
+  }
+
+  // Footer
+  doc.setFontSize(8); doc.setTextColor(150,150,150);
+  doc.text("Bibi ile öğrenmek eğlenceli!", pageW/2, pageH-6, {align:"center"});
+
+  doc.save(`bibi-${child.name}-${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.pdf`);
+  pdfImages=[];
+}
+
 let speechWords = [];
 let speechWordIndex = 0;
 let speechPaused = false;
