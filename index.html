@@ -3933,98 +3933,90 @@ async function generatePresentationContent(topic, slideCount, age){
     ? `9-12 yaş için: Açıklayıcı ve eğitici, örnekler ver, bilimsel gerçekler ekle, anlaşılır dil. Her madde 10-15 kelime.`
     : `13-15 yaş için: Akademik dil, detaylı bilgi, sayısal veriler, bilimsel terminoloji, eleştirel düşünme soruları. Her madde 15-20 kelime.`;
 
-  const slidePrompt = age<=8
-    ? `Başlık sade, maddeler çok kısa ve eğlenceli, emoji kullan. Kapak ve bitiş slaytı hariç ${slideCount} içerik slaytı.`
-    : age<=12
-    ? `Her slayt için 4 detaylı madde, örnekler ekle. Kapak ve bitiş slaytı hariç ${slideCount} içerik slaytı.`
-    : `Her slayt için 4-5 akademik madde, istatistik/tarih/kaynak öner. Kapak ve bitiş slaytı hariç ${slideCount} içerik slaytı.`;
-
   notif.textContent = "📚 İçerik hazırlanıyor...";
 
   const result = await callAI(null, [{role:"user", content:
 `"${topic}" hakkında kapsamlı ve detaylı bir sunu hazırla.
 
 ${agePrompt}
-${slidePrompt}
+Kapak ve bitiş slaytı hariç ${slideCount} içerik slaytı.
 
 ÖNEMLİ KURALLAR:
 - Her slayt GERÇEK ve DOĞRU bilgi içermeli
 - Maddeler boş olmamalı, her biri anlamlı cümle olmalı
-- Kapak slaytı: sadece başlık ve alt başlık
-- İçerik slaytları: konu hakkında gerçek bilgiler
-- Bitiş slaytı: özet veya ilginç bir soru
+- Her slayt için "image_query" alanı: o slaytın konusunu en iyi temsil eden İngilizce görsel arama terimi (3-5 kelime, fotoğraf kalitesinde)
 - Toplam ${slideCount + 2} slayt (kapak + ${slideCount} içerik + bitiş)
 
-JSON formatında döndür (başka hiçbir şey yazma):
+JSON formatında döndür:
 {
   "title": "Ana Başlık",
-  "subtitle": "Alt başlık veya kısa açıklama",
+  "subtitle": "Alt başlık",
+  "cover_image": "kapak için İngilizce görsel terimi",
   "slides": [
     {
       "title": "Slayt Başlığı",
-      "points": ["Madde 1 - detaylı cümle", "Madde 2 - detaylı cümle", "Madde 3 - detaylı cümle", "Madde 4 - detaylı cümle"],
-      "fun_fact": "İlginç bir bilgi veya not (opsiyonel)"
+      "points": ["Madde 1", "Madde 2", "Madde 3", "Madde 4"],
+      "fun_fact": "İlginç bilgi",
+      "image_query": "İngilizce görsel arama terimi"
     }
   ],
-  "ending": "Kapanış mesajı veya düşündürücü soru"
+  "ending": "Kapanış mesajı"
 }`
   }], 2000);
 
-  notif.textContent = "🎨 Sunu oluşturuluyor...";
+  notif.textContent = "🎨 Görseller yükleniyor...";
 
-  let parsed = {title: topic, subtitle: "", slides: [], ending: ""};
+  let parsed = {title:topic, subtitle:"", cover_image:topic, slides:[], ending:""};
   try{
-    const clean = result.replace(/```json|```/g,"").trim();
-    parsed = JSON.parse(clean);
+    parsed = JSON.parse(result.replace(/```json|```/g,"").trim());
   }catch(e){
-    console.error("Sunu parse hatası:", e);
-    parsed = {
-      title: topic,
-      subtitle: "Bibi ile Araştırma",
-      slides: Array.from({length: slideCount}, (_,i) => ({
-        title: `${topic} — Bölüm ${i+1}`,
-        points: ["İçerik yükleniyor..."],
-        fun_fact: ""
-      })),
-      ending: "Çok şey öğrendik!"
-    };
+    console.error("Parse hatası:", e);
   }
 
-  notif.remove();
-  addMsg("bibi", `"${topic}" sunusu hazır! 📊 ${parsed.slides.length} slayt oluşturuldu, indiriliyor...`);
+  // Her slayt için görsel URL'i oluştur (Pollinations — direkt URL)
+  const imgStyle = getImageStyle(age);
+  function makeImgUrl(query, seed){
+    const q = encodeURIComponent(`${query}, ${imgStyle}, high quality, detailed`);
+    return `https://image.pollinations.ai/prompt/${q}?width=1200&height=700&seed=${seed}&nologo=true&model=turbo`;
+  }
 
-  // Sunu HTML'i oluştur
+  const coverImg = makeImgUrl(parsed.cover_image||topic, 100);
+  const slideImgs = parsed.slides.map((s,i)=> makeImgUrl(s.image_query||s.title, i*37+200));
+
+  notif.remove();
+  addMsg("bibi", `"${topic}" sunusu hazırlandı! 📊 ${parsed.slides.length} slayt + görseller oluşturuldu, indiriliyor...`);
+
   const sc = ["<","/script>"].join("");
   const scO = ["<","script>"].join("");
 
-  const colors = age<=8
-    ?["#c0392b","#e67e22","#27ae60","#2980b9","#8e44ad","#c0392b"]
-    :age<=12
-    ?["#1a3a5c","#1a4a2a","#3d1a5c","#1a3a4a","#4a2a1a","#1a3a5c"]
-    :["#0f1f35","#0f2818","#1f0f35","#0f2535","#2a1208","#0f1f35"];
+  const overlayOpacity = age<=8 ? "0.55" : age<=12 ? "0.65" : "0.72";
+  const overlayColor = age<=8 ? "rgba(10,20,40," : age<=12 ? "rgba(5,15,30," : "rgba(0,5,20,";
 
-  const slideHTML = parsed.slides.map((s, i) => {
-    const bgColor = colors[(i+1) % colors.length];
-    const pointsHTML = (s.points||[]).map(p =>
-      `<li style="font-size:${age<=8?"19px":age<=12?"17px":"15px"};line-height:1.5;display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
-        <span style="flex-shrink:0;margin-top:2px">${style.bullet}</span>
+  const slideHTML = parsed.slides.map((s,i)=>{
+    const bg = slideImgs[i];
+    const pointsHTML = (s.points||[]).map(p=>
+      `<li style="font-size:${age<=8?"18px":age<=12?"16px":"15px"};line-height:1.6;display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">
+        <span style="flex-shrink:0;margin-top:3px;font-size:14px">${style.bullet}</span>
         <span>${p}</span>
       </li>`
     ).join("");
 
     const funFact = s.fun_fact ? `
-      <div style="margin-top:20px;padding:10px 14px;background:rgba(255,255,255,.08);border-radius:10px;border-left:3px solid rgba(255,255,255,.4);font-size:${age<=8?"13px":"12px"};opacity:.8">
+      <div style="margin-top:16px;padding:10px 14px;background:rgba(255,255,255,.1);border-radius:10px;border-left:3px solid rgba(255,255,255,.5);font-size:13px;opacity:.9;backdrop-filter:blur(4px)">
         💡 ${s.fun_fact}
       </div>` : "";
 
     return `
-    <div class="slide" style="background:${bgColor}">
-      <div style="font-size:10px;opacity:.35;margin-bottom:12px;letter-spacing:2px;text-transform:uppercase">
-        ${parsed.title} — ${i+1}/${parsed.slides.length}
+    <div class="slide" style="background-image:url('${bg}');background-size:cover;background-position:center">
+      <div style="position:absolute;inset:0;background:${overlayColor}${overlayOpacity})"></div>
+      <div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;justify-content:center;padding:50px 60px">
+        <div style="font-size:10px;opacity:.5;margin-bottom:12px;letter-spacing:2px;text-transform:uppercase">
+          ${parsed.title} — ${i+1}/${parsed.slides.length}
+        </div>
+        <h2 style="font-size:${age<=8?"28px":age<=12?"24px":"22px"};font-weight:900;margin-bottom:18px;line-height:1.2;text-shadow:0 2px 8px rgba(0,0,0,.5);border-bottom:1px solid rgba(255,255,255,.2);padding-bottom:12px">${s.title}</h2>
+        <ul style="list-style:none">${pointsHTML}</ul>
+        ${funFact}
       </div>
-      <h2 style="font-size:${age<=8?"30px":age<=12?"26px":"22px"};font-weight:900;margin-bottom:20px;line-height:1.2;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:12px">${s.title}</h2>
-      <ul style="list-style:none;flex:1">${pointsHTML}</ul>
-      ${funFact}
     </div>`;
   }).join("");
 
@@ -4034,34 +4026,37 @@ JSON formatında döndür (başka hiçbir şey yazma):
     `<title>${parsed.title}</title>`,
     '<style>',
     '*{margin:0;padding:0;box-sizing:border-box}',
-    'body{font-family:"Segoe UI",Tahoma,sans-serif;background:#0a0a0a;color:#fff;height:100vh;overflow:hidden}',
-    '.slide{display:none;height:100vh;padding:50px 60px;flex-direction:column;justify-content:center}',
-    '.slide.active{display:flex}',
-    '.nav{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:10;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:20px;backdrop-filter:blur(8px)}',
-    'nav-btn{padding:7px 18px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:700;cursor:pointer}',
-    'button{padding:7px 18px;border:1px solid rgba(255,255,255,.2);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:700;cursor:pointer}',
+    'body{font-family:"Segoe UI",Tahoma,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden}',
+    '.slide{display:none;position:relative;height:100vh;background-size:cover;background-position:center}',
+    '.slide.active{display:block}',
+    '.nav{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:100;background:rgba(0,0,0,.5);padding:8px 14px;border-radius:20px;backdrop-filter:blur(12px)}',
+    'button{padding:7px 18px;border:1px solid rgba(255,255,255,.25);border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:700;cursor:pointer}',
     'button:hover{background:rgba(255,255,255,.25)}',
-    '.counter{color:rgba(255,255,255,.5);font-size:12px;min-width:70px;text-align:center}',
-    '@keyframes fi{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}',
-    '.slide.active{animation:fi .35s ease}',
+    '.counter{color:rgba(255,255,255,.6);font-size:12px;min-width:70px;text-align:center}',
+    '.loading-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;font-size:14px;opacity:.4}',
+    '@keyframes fi{from{opacity:0}to{opacity:1}}',
+    '.slide.active{animation:fi .4s ease}',
     '</style></head><body>',
 
-    // Kapak slaytı
-    `<div class="slide active" style="background:${colors[0]};text-align:center;align-items:center;justify-content:center">`,
-    `<div style="font-size:${age<=8?"18px":"14px"};opacity:.5;margin-bottom:16px;letter-spacing:3px;text-transform:uppercase">SUNUM</div>`,
-    `<h1 style="font-size:${age<=8?"48px":age<=12?"42px":"36px"};font-weight:900;margin-bottom:16px;line-height:1.1">${parsed.title}</h1>`,
-    `<p style="font-size:${age<=8?"18px":"16px"};opacity:.6;max-width:500px">${parsed.subtitle||""}</p>`,
-    `<p style="font-size:13px;opacity:.35;margin-top:24px">${currentChild?.name||""} • ${new Date().toLocaleDateString("tr-TR")} • Bibi ile hazırlandı</p>`,
-    '</div>',
+    // Kapak
+    `<div class="slide active" style="background-image:url('${coverImg}');background-size:cover;background-position:center">`,
+    `<div style="position:absolute;inset:0;background:${overlayColor}0.6)"></div>`,
+    `<div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">`,
+    `<h1 style="font-size:${age<=8?"52px":age<=12?"44px":"38px"};font-weight:900;margin-bottom:16px;text-shadow:0 4px 16px rgba(0,0,0,.6);line-height:1.1">${parsed.title}</h1>`,
+    `<p style="font-size:${age<=8?"20px":"17px"};opacity:.75;max-width:500px;text-shadow:0 2px 8px rgba(0,0,0,.5)">${parsed.subtitle||""}</p>`,
+    `<p style="font-size:13px;opacity:.4;margin-top:24px">${currentChild?.name||""} • ${new Date().toLocaleDateString("tr-TR")} • Bibi ile hazırlandı</p>`,
+    '</div></div>',
 
     slideHTML,
 
-    // Bitiş slaytı
-    `<div class="slide" style="background:${colors[0]};text-align:center;align-items:center;justify-content:center">`,
-    `<div style="font-size:${age<=8?"56px":"48px"};margin-bottom:20px">${age<=8?"🌟":"✅"}</div>`,
-    `<h2 style="font-size:${age<=8?"32px":age<=12?"28px":"24px"};font-weight:900;margin-bottom:12px">${age<=8?"Harika İş!":age<=12?"Tebrikler!":"Sunum Tamamlandı"}</h2>`,
-    `<p style="font-size:${age<=8?"16px":"14px"};opacity:.6;max-width:400px;line-height:1.6">${parsed.ending||""}</p>`,
-    '</div>',
+    // Bitiş
+    `<div class="slide" style="background-image:url('${coverImg}');background-size:cover;background-position:center">`,
+    `<div style="position:absolute;inset:0;background:${overlayColor}0.7)"></div>`,
+    `<div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">`,
+    `<div style="font-size:${age<=8?"64px":"52px"};margin-bottom:20px">${age<=8?"🌟":"✅"}</div>`,
+    `<h2 style="font-size:${age<=8?"36px":age<=12?"30px":"26px"};font-weight:900;margin-bottom:14px;text-shadow:0 2px 8px rgba(0,0,0,.5)">${age<=8?"Harika İş!":age<=12?"Tebrikler!":"Sunum Tamamlandı"}</h2>`,
+    `<p style="font-size:${age<=8?"17px":"15px"};opacity:.7;max-width:400px;line-height:1.6;text-shadow:0 1px 4px rgba(0,0,0,.5)">${parsed.ending||""}</p>`,
+    '</div></div>',
 
     '<div class="nav">',
     '<button onclick="p()">← Önceki</button>',
@@ -4078,10 +4073,10 @@ JSON formatında döndür (başka hiçbir şey yazma):
     'if(e.key==="ArrowRight"||e.key===" "){e.preventDefault();n();}',
     'if(e.key==="ArrowLeft"){e.preventDefault();p();}',
     '});',
-    sc, '</body></html>'
+    sc,'</body></html>'
   ].join("\n");
 
-  const blob = new Blob([html], {type:"text/html"});
+  const blob = new Blob([html],{type:"text/html"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href=url; a.download=`${topic.slice(0,20)}-sunu-${currentChild?.name||""}.html`; a.click();
@@ -4089,18 +4084,11 @@ JSON formatında döndür (başka hiçbir şey yazma):
   showNotif("✅ Sunu indirildi!");
 }
 
-
   const notif = document.createElement("div");
-  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#7C3AED;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease";
-
-function _closeMenuOutside(e){
-  const menu = document.getElementById("action-menu");
-  const btn = document.getElementById("action-btn");
-  if(menu && !menu.contains(e.target) && e.target !== btn){
-    closeActionMenu();
-    document.removeEventListener("click", _closeMenuOutside);
-  }
-}
+  notif.id = "pres-notif";
+  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#7C3AED;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease;text-align:center;min-width:220px";
+  notif.textContent = "🔍 Konu araştırılıyor...";
+  document.body.appendChild(notif);
 
 function closeActionMenu(){
   const menu = document.getElementById("action-menu");
