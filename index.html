@@ -80,7 +80,15 @@ const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemi
 const HF_KEY = "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";
 const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1";
 
-// Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
+// Görsel üretme — Pollinations.ai (ücretsiz, kısıtlama yok)
+async function generateImage(prompt){
+  const translateRes = await callAI(null, [{role:"user", content:`Translate to English for image generation, child-friendly, max 12 words: "${prompt}"`}], 60);
+  const englishPrompt = (translateRes?.trim() || prompt).replace(/['"]/g,"");
+  const safePrompt = encodeURIComponent(englishPrompt + ", children illustration, colorful, cute, cartoon style");
+  const seed = Math.floor(Math.random()*1000000);
+  const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=512&height=512&seed=${seed}&nologo=true&model=turbo`;
+  return url; // Direkt URL döner, fetch gerekmez
+}
 async function callAI(systemPrompt, messages, maxTokens=1000){
   const apiMessages = [];
   if(systemPrompt) apiMessages.push({role:"system", content:systemPrompt});
@@ -3671,49 +3679,29 @@ async function addImageToChat(prompt){
   const imgUrl = await generateImage(prompt);
   loadRow.remove();
 
-  if(imgUrl === "loading"){
-    addMsg("bibi", "Model şu an yükleniyor, 20 saniye sonra tekrar dene! 🎨");
-    return;
-  }
-  if(!imgUrl){
-    addMsg("bibi", "Görseli üretemedi, tekrar dener misin? 🙈");
-    return;
-  }
+  if(!imgUrl){ addMsg("bibi","Görsel üretemedi 🙈"); return; }
 
-  // Görseli göster
+  // Görseli göster — img onload bekle
   const imgRow = document.createElement("div");
   imgRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
   imgRow.innerHTML = `
     <div style="flex-shrink:0;width:36px;height:36px">${bibiFaceSVG("happy",36)}</div>
     <div style="max-width:80%">
-      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px" alt="Bibi'nin çizimi"/>
+      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px" alt="Bibi'nin çizimi" onload="this.parentElement.parentElement.scrollIntoView({behavior:'smooth'})"/>
       <div style="display:flex;gap:8px">
-        <button onclick="downloadImage('${imgUrl}')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">⬇️ İndir</button>
-        <button onclick="addImageToPDF('${imgUrl}')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e ekle</button>
+        <a href="${imgUrl}" download="bibi-gorseli.png" target="_blank" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none">⬇️ İndir</a>
+        <button onclick="pdfImages.push('${imgUrl}');showNotif('📄 PDF\\'e eklendi!')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e ekle</button>
       </div>
     </div>`;
   msgsEl.appendChild(imgRow);
   msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
-function downloadImage(url){
-  const a = document.createElement("a");
-  a.href = url; a.download = "bibi-gorseli.png"; a.click();
-}
-
-// PDF için görsel listesi
-let pdfImages = [];
-let pdfMessages = [];
-
-function addImageToPDF(url){
-  pdfImages.push(url);
-  const count = pdfImages.length;
-  // Küçük bildirim
-  const notif = document.createElement("div");
-  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease";
-  notif.textContent = `✅ PDF'e eklendi (${count} görsel)`;
-  document.body.appendChild(notif);
-  setTimeout(()=>notif.remove(), 2000);
+function showNotif(msg){
+  const n=document.createElement("div");
+  n.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease";
+  n.textContent=msg; document.body.appendChild(n);
+  setTimeout(()=>n.remove(),2000);
 }
 
 
