@@ -447,17 +447,17 @@ function updatePresenceUI(state, myChildren){
   const myChildIds = new Set(myChildren.map(c=>c.id));
 
   document.querySelectorAll('[id^="presence-"]').forEach(dot => {
+    if(!dot.id.startsWith('presence-') || dot.id.includes('label')) return;
     const childId = dot.id.replace('presence-','');
     if(myChildIds.has(childId)) return;
     const isOnline = onlineChildIds.has(childId);
-    dot.style.background = isOnline ? '#4ade80' : '#6B7280';
-    dot.title = isOnline ? 'Online' : 'Offline';
+    dot.style.background = isOnline ? '#4ade80' : '#ef4444';
+    dot.title = isOnline ? 'Çevrimiçi' : 'Çevrimdışı';
 
-    // Label güncelle
     const label = document.getElementById(`presence-label-${childId}`);
     if(label){
-      label.textContent = isOnline ? '● online' : '● offline';
-      label.style.color = isOnline ? '#4ade80' : '#6B7280';
+      label.textContent = isOnline ? '● Çevrimiçi' : '● Çevrimdışı';
+      label.style.color = isOnline ? '#4ade80' : '#ef4444';
     }
   });
 }
@@ -822,12 +822,12 @@ async function loadFriends(child){
     <div style="background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:12px;animation:fadeUp .3s ease">
       <div style="position:relative;flex-shrink:0">
         <div style="width:46px;height:46px;border-radius:50%;background:${avatarColors[i%avatarColors.length]};display:flex;align-items:center;justify-content:center;font-size:22px;overflow:hidden">${avatarHtml}</div>
-        <div id="presence-${f.id}" style="position:absolute;bottom:0px;right:0px;width:13px;height:13px;border-radius:50%;background:#6B7280;border:2.5px solid #0f2520;transition:background .4s" title="Offline"></div>
+        <div id="presence-${f.id}" style="position:absolute;bottom:0px;right:0px;width:13px;height:13px;border-radius:50%;background:#ef4444;border:2.5px solid #0f2520;transition:background .4s" title="Offline"></div>
       </div>
       <div style="flex:1">
         <div style="display:flex;align-items:center;gap:6px">
           <span style="color:white;font-size:15px;font-weight:800">${f.name}</span>
-          <span id="presence-label-${f.id}" style="font-size:10px;font-weight:700;color:#6B7280">●  offline</span>
+          <span id="presence-label-${f.id}" style="font-size:10px;font-weight:800;color:#ef4444;background:rgba(0,0,0,.35);padding:2px 7px;border-radius:10px;backdrop-filter:blur(4px)">● Çevrimdışı</span>
         </div>
         <div style="color:rgba(255,255,255,.5);font-size:12px;margin-top:2px">${f.age} yaş ${f.bibi_specialty?`· ${specialtyIcons[f.bibi_specialty]||"⭐"} ${f.bibi_specialty} Uzmanı`:""}</div>
       </div>
