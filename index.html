@@ -78,7 +78,7 @@ const GROQ_KEY = "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";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 const HF_KEY = "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";
-const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0";
+const HF_MODEL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell";
 
 // Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
 async function callAI(systemPrompt, messages, maxTokens=1000){
@@ -3596,37 +3596,35 @@ async function goBack(){
 // ── VOICE ─────────────────────────────────────────────────────
 // ── Görsel Üretme (Hugging Face) ─────────────────────────────
 async function generateImage(prompt){
-  // Türkçe promptu İngilizce'ye çevir (HF modeli İngilizce daha iyi)
-  const translateRes = await callAI(null, [{role:"user", content:`Translate this to English for an image generation prompt, keep it simple and child-friendly, max 20 words: "${prompt}"`}], 100);
-  const englishPrompt = translateRes?.trim() || prompt;
-  const safePrompt = `${englishPrompt}, children's illustration style, colorful, cute, safe for kids, cartoon`;
+  const translateRes = await callAI(null, [{role:"user", content:`Translate to English for image generation, child-friendly, max 15 words: "${prompt}"`}], 60);
+  const englishPrompt = (translateRes?.trim() || prompt) + ", children's illustration, colorful, cute, safe for kids";
 
-  try{
-    const res = await fetch(HF_MODEL, {
-      method:"POST",
-      headers:{
-        "Authorization": `Bearer ${HF_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        inputs: safePrompt,
-        parameters: { num_inference_steps: 20, guidance_scale: 7.5 }
-      })
-    });
+  // 2 kez dene (model ısınıyor olabilir)
+  for(let attempt=0; attempt<2; attempt++){
+    try{
+      const res = await fetch(HF_MODEL, {
+        method:"POST",
+        headers:{"Authorization":`Bearer ${HF_KEY}`,"Content-Type":"application/json"},
+        body: JSON.stringify({inputs: englishPrompt})
+      });
 
-    if(!res.ok){
-      const err = await res.text();
-      // Model yükleniyor olabilir
-      if(res.status === 503) return "loading";
-      throw new Error(err);
+      if(res.status === 503){
+        // Model yükleniyor — 8 saniye bekle ve tekrar dene
+        if(attempt===0){ await new Promise(r=>setTimeout(r,8000)); continue; }
+        return "loading";
+      }
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const blob = await res.blob();
+      if(blob.size < 1000) throw new Error("Boş görsel");
+      return URL.createObjectURL(blob);
+
+    }catch(e){
+      console.error(`Görsel deneme ${attempt+1}:`, e.message);
+      if(attempt===0) await new Promise(r=>setTimeout(r,3000));
     }
-
-    const blob = await res.blob();
-    return URL.createObjectURL(blob);
-  }catch(e){
-    console.error("Görsel üretme hatası:", e);
-    return null;
   }
+  return null;
 }
 
 // Mesajda görsel isteği var mı?
