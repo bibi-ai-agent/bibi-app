@@ -3615,43 +3615,6 @@ async function goBack(){
 
 // ── VOICE ─────────────────────────────────────────────────────
 // ── Görsel Üretme (Hugging Face) ─────────────────────────────
-async function generateImage(prompt){
-  const translateRes = await callAI(null, [{role:"user", content:`Translate to English for image generation, child-friendly, max 15 words: "${prompt}"`}], 60);
-  const englishPrompt = (translateRes?.trim() || prompt) + ", children's illustration, colorful, cute, safe for kids";
-
-  // 2 kez dene (model ısınıyor olabilir)
-  for(let attempt=0; attempt<2; attempt++){
-    try{
-      const res = await fetch(HF_MODEL, {
-        method:"POST",
-        headers:{"Authorization":`Bearer ${HF_KEY}`,"Content-Type":"application/json"},
-        body: JSON.stringify({inputs: englishPrompt})
-      });
-
-      if(res.status === 503){
-        if(attempt===0){
-          // Model yükleniyor — loading mesajı göster
-          const loadMsg = document.getElementById("img-loading-msg");
-          if(loadMsg) loadMsg.textContent = "Model ısınıyor, 15 saniye bekleniyor...";
-          await new Promise(r=>setTimeout(r,15000));
-          continue;
-        }
-        return "loading";
-      }
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const blob = await res.blob();
-      if(blob.size < 1000) throw new Error("Boş görsel");
-      return URL.createObjectURL(blob);
-
-    }catch(e){
-      console.error(`Görsel deneme ${attempt+1}:`, e.message);
-      if(attempt===0) await new Promise(r=>setTimeout(r,3000));
-    }
-  }
-  return null;
-}
-
 // Mesajda görsel isteği var mı?
 function detectImageRequest(text){
   const keywords = ["çiz","resim yap","görsel yap","resim çiz","fotoğraf çek","illüstrasyon","draw","paint","picture of","image of","göster","çizim"];
