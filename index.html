@@ -139,6 +139,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // ══════════════════════════════════════════════════════════════
 let currentUser = null, currentChild = null, sessionId = null;
 let sessionStart = null, messages = [], voiceOn = false;
+let lastInputMode = "text"; // "voice" veya "text"
 let isListening = false, recognition = null;
 
 // ══════════════════════════════════════════════════════════════
@@ -3215,19 +3216,21 @@ async function startChat(child){
     : `Selam ${child.name}. Bugün ne konuşacağız?`;
   addMsg("bibi", openMsg);
 
-  // Ses butonunu başlangıç durumuna göre güncelle
-  setTimeout(()=>{
-    updateVoiceBtn();
-    // 6-8 yaş → mic butonunu vurgula
-    if(child.age <= 8){
+  // 6-8 yaş → ilk mesajı sesli oku
+  if(child.age <= 8){
+    setTimeout(()=>{
+      speak(openMsg);
+      // Mic butonunu vurgula
       const micBtn = document.getElementById("mic-btn");
       if(micBtn){
         micBtn.style.background = "rgba(74,222,128,.3)";
         micBtn.style.borderColor = "rgba(74,222,128,.5)";
         micBtn.style.boxShadow = "0 0 12px rgba(74,222,128,.4)";
       }
-    }
-  }, 300);
+    }, 500);
+  } else {
+    setTimeout(()=>{ updateVoiceBtn(); }, 300);
+  }
 }
 
 function setExpr(expr){
@@ -3310,13 +3313,26 @@ function addTyping(){
 function removeTyping(){ const t=el("typing-row"); if(t) t.remove(); }
 function setInput(v){ const i=el("chat-input"); if(i) i.value=v; }
 
-async function sendMessage(){
+async function sendMessage(fromVoice=false){
   const inp=el("chat-input"); if(!inp) return;
   const text=inp.value.trim(); if(!text) return;
   inp.value="";
   addMsg("user",text);
   setExpr("thinking"); setStatus("Düşünüyor...","#fbbf24");
   addTyping();
+
+  // 6-8 yaş: input modunu takip et
+  if(currentChild?.age<=8){
+    if(fromVoice){
+      lastInputMode="voice";
+      voiceOn=true;
+    } else {
+      lastInputMode="text";
+      voiceOn=false;
+    }
+    updateVoiceBtn();
+  }
+
   const topic = detectTopic(text);
   const homeworkMode = isHomeworkQuestion(text);
   const imageRequest = detectImageRequest(text);
@@ -3345,7 +3361,10 @@ async function sendMessage(){
     setExpr("happy"); setStatus("Seninle burada!","#4ade80");
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("happy",44);
     addMsg("bibi",reply||"Bir sorun oluştu 🙈");
-    // speak(reply); — otomatik ses kapalı, kullanıcı ▶ butonuna basarsa çalar
+    // 6-8 yaş + sesli mod → cevabı otomatik oku
+    if(currentChild?.age<=8 && lastInputMode==="voice"){
+      speak(reply);
+    }
     setTimeout(()=>{ setExpr("idle"); const w=el("bibi-face-wrap"); if(w) w.innerHTML=bibiFaceSVG("idle",44); },3000);
     if(sessionId){
       const {error:aErr} = await sb.from("messages").insert({session_id:sessionId,child_id:currentChild.id,role:"assistant",content:reply,language:"tr"});
@@ -3671,8 +3690,65 @@ function showNotif(msg){
 }
 
 
-// ── + Aksiyon Menüsü ──────────────────────────────────────────
+// ── Mikrofon ─────────────────────────────────────────────────
+function toggleMic(){
+  if(isListening){ stopMic(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){
+    const err=el("mic-err"); if(err){err.textContent="Tarayıcın sesli girişi desteklemiyor 😔";err.style.display="block";setTimeout(()=>err.style.display="none",3000);}
+    return;
+  }
+  recognition = new SR();
+  recognition.lang = "tr-TR";
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  const btn = el("mic-btn");
+
+  recognition.onstart = ()=>{
+    isListening=true;
+    if(btn){ btn.style.background="rgba(239,68,68,.4)"; btn.style.boxShadow="0 0 16px rgba(239,68,68,.5)"; }
+    const inp=el("chat-input"); if(inp) inp.placeholder="Dinleniyor... 🎤";
+  };
+
+  recognition.onresult = e=>{
+    let interim="", final="";
+    for(let i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal) final+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    const inp=el("chat-input");
+    if(inp) inp.value = final||interim;
+    if(final){
+      recognition.stop();
+      setTimeout(()=>sendMessage(true), 200); // fromVoice=true
+    }
+  };
+
+  recognition.onerror = e=>{
+    isListening=false;
+    if(btn){ btn.style.background="rgba(255,255,255,.12)"; btn.style.boxShadow="none"; }
+    const inp=el("chat-input"); if(inp) inp.placeholder="Bibi'ye yaz veya konuş...";
+  };
+
+  recognition.onend = ()=>{
+    isListening=false;
+    if(btn){ btn.style.background=currentChild?.age<=8?"rgba(74,222,128,.3)":"rgba(255,255,255,.12)"; btn.style.boxShadow="none"; }
+    const inp=el("chat-input"); if(inp) inp.placeholder="Bibi'ye yaz veya konuş...";
+  };
+
+  recognition.start();
+}
+
+function stopMic(){
+  if(recognition){ try{recognition.stop();}catch(e){} }
+  isListening=false;
+  const btn=el("mic-btn");
+  if(btn){ btn.style.background=currentChild?.age<=8?"rgba(74,222,128,.3)":"rgba(255,255,255,.12)"; btn.style.boxShadow="none"; }
+}
 function toggleActionMenu(){
+
+
   const menu = document.getElementById("action-menu");
   const btn = document.getElementById("action-btn");
   if(!menu) return;
