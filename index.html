@@ -3164,6 +3164,9 @@ async function startChat(child){
             <button onclick="closeActionMenu();addImageRequest()" style="width:100%;padding:11px 14px;border:none;background:transparent;color:white;font-size:14px;font-weight:700;cursor:pointer;border-radius:10px;text-align:left;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
               <span style="font-size:18px">🎨</span> Görsel Oluştur
             </button>
+            <button onclick="closeActionMenu();showHomeworkMode()" style="width:100%;padding:11px 14px;border:none;background:transparent;color:white;font-size:14px;font-weight:700;cursor:pointer;border-radius:10px;text-align:left;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
+              <span style="font-size:18px">📚</span> Ödev Modu
+            </button>
             <button onclick="closeActionMenu();showContentCreator('pdf')" style="width:100%;padding:11px 14px;border:none;background:transparent;color:white;font-size:14px;font-weight:700;cursor:pointer;border-radius:10px;text-align:left;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='rgba(255,255,255,.08)'" onmouseout="this.style.background='transparent'">
               <span style="font-size:18px">📄</span> PDF Oluştur
             </button>
@@ -3794,7 +3797,174 @@ function addImageRequest(){
 }
 
 
+// ── Görüntü analizi (Groq Vision) ───────────────────────────
+async function analyzeImageWithGroq(base64Image, prompt){
+  const res = await fetch(GROQ_URL, {
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${GROQ_KEY}`},
+    body: JSON.stringify({
+      model: "meta-llama/llama-4-scout-17b-16e-instruct",
+      messages:[{
+        role:"user",
+        content:[
+          {type:"image_url", image_url:{url:`data:image/jpeg;base64,${base64Image}`}},
+          {type:"text", text: prompt}
+        ]
+      }],
+      max_tokens: 1500
+    })
+  });
+  const data = await res.json();
+  if(!res.ok) throw new Error(data.error?.message||"Vision API hatası");
+  return data.choices?.[0]?.message?.content || "";
+}
+
+let homeworkState = null;
+let homeworkImageBase64 = null;
+
+function showHomeworkMode(){
+  const overlay = document.createElement("div");
+  overlay.id = "homework-modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:flex;align-items:flex-end;justify-content:center;font-family:'Nunito',sans-serif;animation:fadeIn .2s ease";
+  overlay.innerHTML = `
+    <div style="width:100%;max-width:480px;background:linear-gradient(135deg,#1A2E2A,#243d38);border-radius:24px 24px 0 0;padding:24px 20px 36px;box-shadow:0 -8px 40px rgba(0,0,0,.4)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+        <div>
+          <div style="color:white;font-size:17px;font-weight:900">📚 Ödev Modu</div>
+          <div style="color:rgba(255,255,255,.45);font-size:12px;margin-top:3px">Ödev fotoğrafını yükle, Bibi birlikte çözsün</div>
+        </div>
+        <button onclick="document.getElementById('homework-modal').remove()" style="width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:white;font-size:16px">✕</button>
+      </div>
+      <div id="hw-upload-area" onclick="document.getElementById('hw-file-input').click()"
+        style="border:2px dashed rgba(255,255,255,.2);border-radius:16px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px"
+        onmouseover="this.style.borderColor='rgba(13,155,126,.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,.2)'">
+        <div style="font-size:36px;margin-bottom:10px">📸</div>
+        <div style="color:white;font-size:15px;font-weight:700">Ödev fotoğrafı yükle</div>
+        <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:6px">Alıştırma, test, problem sayfası...</div>
+        <input type="file" id="hw-file-input" accept="image/*" style="display:none" onchange="handleHomeworkPhoto(this)"/>
+      </div>
+      <div id="hw-preview" style="display:none;margin-bottom:14px">
+        <img id="hw-preview-img" style="width:100%;border-radius:12px;max-height:200px;object-fit:contain;background:#000"/>
+      </div>
+      <div id="hw-loading" style="display:none;text-align:center;padding:12px">
+        <div style="display:flex;gap:6px;justify-content:center;margin-bottom:8px">
+          ${[0,1,2].map(i=>`<div style="width:8px;height:8px;border-radius:50%;background:#4ade80;animation:dotPulse 1.2s ease ${i*.2}s infinite"></div>`).join("")}
+        </div>
+        <div style="color:rgba(255,255,255,.5);font-size:13px">Bibi ödevi inceliyor...</div>
+      </div>
+      <div id="hw-err" style="display:none;color:#fca88a;font-size:12px;margin-bottom:10px;text-align:center"></div>
+      <button id="hw-start-btn" onclick="startHomeworkMode()" style="display:none;width:100%;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,#0D9B7E,#2563EB);color:white;font-weight:800;font-size:15px;cursor:pointer">
+        📚 Ödevi Başlat
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.onclick = e => { if(e.target===overlay) overlay.remove(); };
+}
+
+function handleHomeworkPhoto(input){
+  const file = input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    homeworkImageBase64 = e.target.result.split(",")[1];
+    const preview = document.getElementById("hw-preview");
+    const img = document.getElementById("hw-preview-img");
+    const btn = document.getElementById("hw-start-btn");
+    if(preview) preview.style.display="block";
+    if(img) img.src = e.target.result;
+    if(btn) btn.style.display="block";
+  };
+  reader.readAsDataURL(file);
+}
+
+async function startHomeworkMode(){
+  if(!homeworkImageBase64) return;
+  const loading=document.getElementById("hw-loading");
+  const btn=document.getElementById("hw-start-btn");
+  if(loading) loading.style.display="block";
+  if(btn) btn.style.display="none";
+
+  const age=currentChild?.age||9;
+  const agePrompt=age<=8?"Çok basit, anlaşılır Türkçe kullan. Emoji ekle.":age<=12?"Açıklayıcı ve sabırlı Türkçe kullan.":"Akademik ama anlaşılır Türkçe kullan.";
+
+  try{
+    const response = await analyzeImageWithGroq(homeworkImageBase64,
+`Bu fotoğrafta bir ödev/alıştırma sayfası var. ${agePrompt} ${age} yaşında çocuk.
+Şunları yap:
+1. Fotoğraftaki soruları listele ve kaç soru olduğunu belirt
+2. Konuyu tespit et
+3. İLK soruyu adım adım açıkla — ama direkt cevap verme, ipuçları ver
+4. Çocuğu diğer soruları yapması için teşvik et
+
+Yanıtın başına ekle:
+SORU_SAYISI: [sayı]
+KONU: [konu]
+---`);
+
+    document.getElementById("homework-modal")?.remove();
+    const sayiMatch=response.match(/SORU_SAYISI:\s*(\d+)/);
+    const konuMatch=response.match(/KONU:\s*(.+)/);
+    const soruSayisi=sayiMatch?parseInt(sayiMatch[1]):1;
+    const konu=konuMatch?konuMatch[1].trim():"Ödev";
+    const clean=response.replace(/SORU_SAYISI:.*\n?/,"").replace(/KONU:.*\n?/,"").replace(/^---\n?/m,"").trim();
+
+    homeworkState={totalQuestions:soruSayisi,subject:konu,step:"first_solved",imageBase64:homeworkImageBase64};
+    addMsg("bibi",`📚 **${konu} Ödevi** — ${soruSayisi} soru tespit ettim!\n\n${clean}\n\n🎯 Şimdi sıra sende! Geri kalan soruları çöz, fotoğrafını gönder — kontrol edeyim! 📸`);
+    showHomeworkCheckButton();
+  }catch(e){
+    const errEl=document.getElementById("hw-err");
+    if(errEl){errEl.style.display="block";errEl.textContent="Fotoğraf analiz edilemedi: "+e.message;}
+    if(loading) loading.style.display="none";
+    if(btn) btn.style.display="block";
+  }
+}
+
+function showHomeworkCheckButton(){
+  document.getElementById("hw-check-bar")?.remove();
+  const bar=document.createElement("div");
+  bar.id="hw-check-bar";
+  bar.style.cssText="padding:8px 14px;background:rgba(13,155,126,.15);border-top:1px solid rgba(13,155,126,.3);display:flex;align-items:center;gap:10px;position:relative;z-index:2;flex-shrink:0";
+  bar.innerHTML=`
+    <div style="flex:1;color:rgba(255,255,255,.7);font-size:12px;font-weight:600">📚 ${homeworkState?.subject||"Ödev"} modu aktif</div>
+    <button onclick="document.getElementById('hw-check-input').click()" style="padding:7px 14px;border-radius:10px;border:none;background:#0D9B7E;color:white;font-size:12px;font-weight:800;cursor:pointer">📸 Ödevimi Göster</button>
+    <input type="file" id="hw-check-input" accept="image/*" style="display:none" onchange="checkHomeworkPhoto(this)"/>
+    <button onclick="endHomeworkMode()" style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;color:rgba(255,255,255,.5);font-size:14px">✕</button>`;
+
+  const chatWrap=document.getElementById("chat-input")?.closest("div[style*='flex-direction:column']");
+  const inputDiv=document.getElementById("chat-input")?.parentElement?.parentElement;
+  if(inputDiv?.parentNode){ inputDiv.parentNode.insertBefore(bar,inputDiv); }
+}
+
+async function checkHomeworkPhoto(input){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    const base64=e.target.result.split(",")[1];
+    addMsg("user","📸 Ödevimi yaptım, kontrol eder misin?");
+    const notif=document.createElement("div");
+    notif.style.cssText="position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500";
+    notif.textContent="📝 Ödev kontrol ediliyor...";
+    document.body.appendChild(notif);
+    try{
+      const response=await analyzeImageWithGroq(base64,
+`Çocuk ödevini yaptı. Önceki ödev: ${homeworkState?.totalQuestions||"?"} soruluk ${homeworkState?.subject||"ödev"}. ${currentChild?.age||9} yaş.
+Yaptığı soruları kontrol et. Doğruları kutla 🌟, yanlışlar için ipuçları ver (cevabı verme), boşları nazikçe teşvik et. Türkçe, pozitif dil.`);
+      notif.remove();
+      addMsg("bibi",response);
+    }catch(e){
+      notif.remove();
+      addMsg("bibi","Fotoğrafı analiz edemedim, tekrar dener misin? 🙈");
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function endHomeworkMode(){
+  homeworkState=null; homeworkImageBase64=null;
+  document.getElementById("hw-check-bar")?.remove();
+}
+
 function getImageStyle(age){
+// ── Yaşa göre görsel stili ────────────────────────────────────
   if(age<=8) return "cartoon style, cute, colorful, simple, children's book illustration, bright colors, friendly characters";
   if(age<=12) return "colorful illustration, semi-realistic, educational style, vibrant, detailed, middle grade";
   return "realistic, professional illustration, detailed, high quality, academic style, sophisticated";
