@@ -78,7 +78,7 @@ const GROQ_KEY = "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";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
 const HF_KEY = "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";
-const HF_MODEL = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-schnell";
+const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1";
 
 // Gemini API çağrısı — OpenRouter formatındaki messages dizisini Gemini formatına çevirir
 async function callAI(systemPrompt, messages, maxTokens=1000){
@@ -3621,8 +3621,13 @@ async function generateImage(prompt){
       });
 
       if(res.status === 503){
-        // Model yükleniyor — 8 saniye bekle ve tekrar dene
-        if(attempt===0){ await new Promise(r=>setTimeout(r,8000)); continue; }
+        if(attempt===0){
+          // Model yükleniyor — loading mesajı göster
+          const loadMsg = document.getElementById("img-loading-msg");
+          if(loadMsg) loadMsg.textContent = "Model ısınıyor, 15 saniye bekleniyor...";
+          await new Promise(r=>setTimeout(r,15000));
+          continue;
+        }
         return "loading";
       }
       if(!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -3658,7 +3663,7 @@ async function addImageToChat(prompt){
       <div style="display:flex;gap:4px">
         ${[0,1,2].map(i=>`<div style="width:6px;height:6px;border-radius:50%;background:#0D9B7E;animation:dotPulse 1.2s ease ${i*.2}s infinite"></div>`).join("")}
       </div>
-      Görsel hazırlanıyor...
+      <span id="img-loading-msg">Görsel hazırlanıyor...</span>
     </div>`;
   msgsEl.appendChild(loadRow);
   msgsEl.scrollTop = msgsEl.scrollHeight;
