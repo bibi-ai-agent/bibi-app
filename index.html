@@ -85,9 +85,29 @@ const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable
 async function generateImage(prompt){
   const age = currentChild?.age || 9;
   const stylePrompt = getImageStyle(age);
-  const translateRes = await callAI(null, [{role:"user", content:`Translate to English for image generation, max 12 words: "${prompt}"`}], 60);
-  const englishPrompt = (translateRes?.trim() || prompt).replace(/['"]/g,"");
-  const safePrompt = encodeURIComponent(`${englishPrompt}, ${stylePrompt}`);
+
+  // Daha iyi prompt mühendisliği — çok öğeli istekleri doğru çevir
+  const translateRes = await callAI(
+    "Sen bir görsel prompt uzmanısın. Türkçe görsel isteklerini İngilizceye çevirirsin. Tüm nesneleri ve karakterleri eksiksiz dahil et.",
+    [{role:"user", content:
+`Şu Türkçe görsel isteğini İngilizce görsel oluşturma prompt'una çevir.
+İstek: "${prompt}"
+
+Kurallar:
+- İstekteki TÜM nesneleri, karakterleri, eylemleri dahil et
+- "birlikte", "ve", "ile" gibi bağlaçları doğru çevir (together, and, with)
+- Sadece İngilizce prompt döndür, başka hiçbir şey yazma
+- Maksimum 20 kelime`
+    }],
+    80
+  );
+
+  const englishPrompt = (translateRes?.trim() || prompt)
+    .replace(/['"]/g,"")
+    .replace(/^\*+|\*+$/g,"")
+    .trim();
+
+  const safePrompt = encodeURIComponent(`${englishPrompt}, ${stylePrompt}, high quality`);
   const seed = Math.floor(Math.random()*1000000);
   const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=512&height=512&seed=${seed}&nologo=true&model=turbo`;
   return url;
@@ -3364,7 +3384,7 @@ async function sendMessage(fromVoice=false){
 
   // Görsel isteği varsa ayrıca görsel üret
   if(imageRequest){
-    addImageToChat(text);
+    handleImageFromMessage(text);
   }
 
   try{
@@ -3668,8 +3688,24 @@ async function goBack(){
 // ── Görsel Üretme (Hugging Face) ─────────────────────────────
 // Mesajda görsel isteği var mı?
 function detectImageRequest(text){
-  const keywords = ["çiz","resim yap","görsel yap","resim çiz","fotoğraf çek","illüstrasyon","draw","paint","picture of","image of","göster","çizim"];
+  const keywords = [
+    "çiz","resim yap","görsel yap","resim çiz","fotoğraf çek",
+    "illüstrasyon","draw","paint","picture","image",
+    "göster","çizim","resim","tablo yap","karikatür"
+  ];
   return keywords.some(k => text.toLowerCase().includes(k));
+}
+
+// Görsel isteğini chat'e ekle — önce Bibi açıklasın
+async function handleImageFromMessage(text){
+  // Bibi ne çizeceğini söylesin
+  const desc = await callAI(
+    "Sen Bibi'sin, çocuklara yardım eden eğlenceli bir asistansın. Kısa ve eğlenceli Türkçe yanıt ver.",
+    [{role:"user", content:`"${text}" isteği için çok kısa (1 cümle) heyecanlı bir yanıt ver, sonra görseli hazırlayacağını söyle.`}],
+    100
+  );
+  if(desc) addMsg("bibi", desc);
+  await addImageToChat(text);
 }
 
 // Görseli chat'e ekle
