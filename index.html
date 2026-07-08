@@ -386,7 +386,7 @@ function bibiFaceSVG(expression="idle", size=110){
 const TOPICS = {
   "Matematik":["matematik","sayı","toplama","çıkarma","çarpma","bölme","kesir","geometri","denklem","yüzde"],
   "Fen":["fen","fizik","kimya","biyoloji","deney","atom","hücre","enerji","kuvvet","gezegen"],
-  "Dil":["türkçe","kelime","cümle","hikaye","şiir","okuma","dilbilgisi","ingilizce","dil"],
+  "Yabancı Dil":["türkçe","kelime","cümle","hikaye","şiir","okuma","dilbilgisi","ingilizce","dil"],
   "Tarih":["tarih","osmanlı","atatürk","savaş","medeniyet","cumhuriyet"],
 };
 function detectTopic(t){
@@ -701,7 +701,7 @@ function screenFriends(child){
       <!-- Uzmanlık rozeti -->
       ${child.bibi_specialty ? `
       <div style="background:linear-gradient(135deg,rgba(13,155,126,.15),rgba(37,99,235,.1));border:1.5px solid rgba(13,155,126,.25);border-radius:16px;padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px">
-        <div style="font-size:32px">${{Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"}[child.bibi_specialty]||"⭐"}</div>
+        <div style="font-size:32px">${{Matematik:"📐",Fen:"🔬","Yabancı Dil":"🌐",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"}[child.bibi_specialty]||"⭐"}</div>
         <div>
           <div style="color:rgba(255,255,255,.45);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px">${child.name}'in Bibi'si</div>
           <div style="color:#4ade80;font-size:15px;font-weight:900;margin-top:2px">${child.bibi_specialty} Uzmanı 🌟</div>
@@ -853,7 +853,7 @@ async function loadFriends(child){
     return;
   }
 
-  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"};
+  const specialtyIcons = {Matematik:"📐",Fen:"🔬","Yabancı Dil":"🌐",Tarih:"🏛️",Sanat:"🎨",Genel:"🌍"};
   const avatarColors=["#7C3AED","#F59E0B","#2563EB","#EC4899","#0D9B7E"];
 
   listEl.innerHTML = friends.map((f,i)=>{
@@ -1106,7 +1106,7 @@ function addProjectTyping(){
 async function sendProjectAI(userText){
   const state = window._projectState;
   addProjectTyping();
-  const specialtyIcons = {Matematik:"📐",Fen:"🔬",Dil:"📖",Tarih:"🏛️",Sanat:"🎨"};
+  const specialtyIcons = {Matematik:"📐",Fen:"🔬","Yabancı Dil":"🌐",Tarih:"🏛️",Sanat:"🎨"};
   const s1 = state.myChild.bibi_specialty, s2 = state.friend.bibi_specialty;
 
   const systemPrompt = `Sen iki farklı çocuğun Bibi'si olarak konuşuyorsun:
@@ -1466,7 +1466,7 @@ async function finishQuiz(){
   }
 
   // Mastery güncelle — doğru yapılan dersler
-  const subjectToTopic = {"Matematik":"Matematik","Fen Bilimleri":"Fen","Türkçe":"Dil","İngilizce":"Dil","Sosyal Bilgiler":"Tarih"};
+  const subjectToTopic = {"Matematik":"Matematik","Fen Bilimleri":"Fen","Türkçe":"Yabancı Dil","İngilizce":"Yabancı Dil","Sosyal Bilgiler":"Tarih"};
   for(const a of answers){
     if(a.correct && subjectToTopic[a.subject]){
       await updateMastery(child.id, subjectToTopic[a.subject]);
@@ -1530,7 +1530,7 @@ function buildPrompt(child, friendChild=null, projectType=null){
   const specialtyProfiles = {
     "Matematik": "Matematik konularında derinsin. Sayılar, geometri, mantık senin oyun alanın. Matematik öğretirken oyunlaştırırsın.",
     "Fen": "Bilim ve keşif senin tutkun. Deneyler, doğa, evren hakkında coşkuyla anlatırsın.",
-    "Dil": "Kelimeler ve hikayeler senin dünyan. Yaratıcı yazarlık, şiir, dil oyunları uzmanlığın.",
+    "Yabancı Dil": "Yabancı diller senin tutkun. İngilizce başta olmak üzere farklı dilleri eğlenceli yollarla öğretirsin.",
     "Tarih": "Geçmiş senin için canlı. Tarihi kişileri ve olayları hikaye gibi anlatırsın.",
     "Sanat": "Yaratıcılık ve estetik senin özün. Çizim, müzik, tasarım konularında ilham verirsin.",
     "Genel": "Merakın sınırı yok. Her konuya eşit ilgiyle yaklaşırsın.",
@@ -2297,7 +2297,7 @@ async function checkPin(){
 }
 
 // ── Gelişim Raporu (Ebeveyn Paneli) ───────────────────────────
-const TOPIC_ICONS = {"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
+const TOPIC_ICONS = {"Matematik":"📐","Fen":"🔬","Yabancı Dil":"🌐","Tarih":"🏛️","Genel":"🌍"};
 async function generateAndShowReport(childId){
   const btn = document.getElementById("gen-report-btn");
   if(btn){ btn.textContent="⏳ Hazırlanıyor..."; btn.disabled=true; }
@@ -2368,8 +2368,8 @@ async function screenReport(child){
   const eColor={happy:"#16A34A",excited:"#D97706",curious:"#2563EB",calm:"#7C3AED",sad:"#64748b",frustrated:"#DC2626",bored:"#6B7280",anxious:"#EA580C"};
   const eBg={happy:"#dcfce7",excited:"#fef3c7",curious:"#dbeafe",calm:"#ede9fe",sad:"#f1f5f9",frustrated:"#fee2e2",bored:"#f3f4f6",anxious:"#ffedd5"};
   const iIcon={sanat:"🎨",spor:"⚽",bilim:"🔬",müzik:"🎵",oyun:"🎮",doğa:"🌿",sosyal:"👥",teknoloji:"💻",edebiyat:"📚",matematik:"📐",genel:"🌍"};
-  const tColor={"Matematik":"#2563EB","Fen":"#16A34A","Dil":"#9333EA","Tarih":"#EA580C","Genel":"#6B7280"};
-  const tIcon={"Matematik":"📐","Fen":"🔬","Dil":"📖","Tarih":"🏛️","Genel":"🌍"};
+  const tColor={"Matematik":"#2563EB","Fen":"#16A34A","Yabancı Dil":"#9333EA","Tarih":"#EA580C","Genel":"#6B7280"};
+  const tIcon={"Matematik":"📐","Fen":"🔬","Yabancı Dil":"🌐","Tarih":"🏛️","Genel":"🌍"};
 
   const positives=["happy","excited","curious","calm"];
   const posCount=Object.entries(emotionCounts).filter(([e])=>positives.includes(e)).reduce((s,[,c])=>s+c,0);
