@@ -3503,65 +3503,81 @@ async function deleteSession(sid){
 
 async function loadSession(sid){
   toggleHistory();
-
-  // Seçilen oturumun mesajlarını çek
-  const {data:oldMsgs, error} = await sb.from("messages")
+  const {data:oldMsgs} = await sb.from("messages")
     .select("role,content,created_at")
     .eq("session_id", sid)
     .order("created_at",{ascending:true});
 
-  if(error || !oldMsgs || oldMsgs.length===0){
-    // Mesaj yoksa uyar
-    const msgsEl=el("messages");
-    if(msgsEl){
-      msgsEl.innerHTML=`<div style="text-align:center;color:rgba(255,255,255,.4);font-size:13px;padding:40px 20px">Bu sohbette mesaj bulunamadı.</div>`;
-    }
-    return;
-  }
-
-  // Mevcut aktif oturumu kapat
-  if(sessionId && sessionId !== sid){
-    const mins=Math.round((new Date()-sessionStart)/60000);
-    await sb.from("sessions").update({
-      ended_at:new Date().toISOString(),
-      duration_mins:mins,
-      message_count:messages.filter(m=>m.r==="user").length
-    }).eq("id",sessionId);
-  }
-
-  // Mesajları ekranda göster
-  messages=[];
-  const msgsEl=el("messages");
-  if(msgsEl) msgsEl.innerHTML="";
-  const qp=el("quick-prompts"); if(qp) qp.style.display="none";
-
-  oldMsgs.forEach(m=>{
-    addMsg(m.role==="user"?"user":"bibi", m.content);
-  });
+  if(!oldMsgs||oldMsgs.length===0){ addMsg("bibi","Bu sohbette mesaj bulunamadı."); return; }
 
   sessionId = sid;
-  sessionStart = new Date();
-}
-
-function newChat(){
-  toggleHistory();
-  sessionId = null;
   messages = [];
-  const msgsEl = el("messages");
-  if(msgsEl) msgsEl.innerHTML="";
-  const qp=el("quick-prompts"); if(qp) qp.style.display="flex";
+  const msgsEl = el("messages"); if(msgsEl) msgsEl.innerHTML="";
+  const qp = el("quick-prompts"); if(qp) qp.style.display="none";
 
-  // Yeni oturum başlat
-  sb.from("sessions").insert({child_id:currentChild.id,started_at:new Date().toISOString()}).select().single().then(({data})=>{if(data) sessionId=data.id;});
+  oldMsgs.forEach(m=>{
+    addMsg(m.role==="user"?"user":"bibi", m.content, false);
+  });
 
-  const openMsg = currentChild.age<=8
-    ? `Heyyyy ${currentChild.name}! Bugün ne öğrenmek istersin? 🎉`
-    : currentChild.age<=12
-    ? `Merhaba ${currentChild.name}! Yeni bir sohbet başlayalım mı?`
-    : `Selam ${currentChild.name}. Ne konuşacağız?`;
-  addMsg("bibi", openMsg);
-  sessionStart = new Date();
+  // Bu oturumun asset'lerini yükle ve göster
+  const assets = await loadSessionAssets(sid);
+  if(assets.length>0) showSessionAssets(assets);
+
+  const msgsContainer = el("messages");
+  if(msgsContainer) msgsContainer.scrollTop = msgsContainer.scrollHeight;
 }
+
+function showSessionAssets(assets){
+  const msgsEl = el("messages"); if(!msgsEl) return;
+
+  const assetDiv = document.createElement("div");
+  assetDiv.style.cssText = "margin:16px 0;padding:14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:14px";
+  assetDiv.innerHTML = `
+    <div style="color:rgba(255,255,255,.5);font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">
+      📎 Bu Sohbetteki İçerikler
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${assets.map(a=>{
+        if(a.type==="image"){
+          return `<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px">
+            <img src="${a.url}" style="width:48px;height:48px;border-radius:8px;object-fit:cover;flex-shrink:0"/>
+            <div style="flex:1;min-width:0">
+              <div style="color:white;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.title||"Görsel"}</div>
+              <div style="color:rgba(255,255,255,.35);font-size:10px;margin-top:2px">${new Date(a.created_at).toLocaleDateString("tr-TR")}</div>
+            </div>
+            <button onclick="downloadImageAsPNG('${a.url}','${(a.title||"gorsel").replace(/\s/g,"-")}.png')"
+              style="padding:5px 10px;border-radius:8px;border:none;background:rgba(13,155,126,.3);color:#4ade80;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">
+              ⬇️ PNG
+            </button>
+          </div>`;
+        }
+        if(a.type==="presentation"){
+          const data = a.content ? JSON.parse(a.content) : {};
+          return `<div style="display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border-radius:10px;padding:8px 10px">
+            <div style="width:48px;height:48px;border-radius:8px;background:rgba(124,58,237,.3);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📊</div>
+            <div style="flex:1;min-width:0">
+              <div style="color:white;font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${data.title||a.title||"Sunu"}</div>
+              <div style="color:rgba(255,255,255,.35);font-size:10px;margin-top:2px">${(data.slides||[]).length} slayt • ${new Date(a.created_at).toLocaleDateString("tr-TR")}</div>
+            </div>
+            <button onclick="redownloadPresentation('${a.id}')"
+              style="padding:5px 10px;border-radius:8px;border:none;background:rgba(124,58,237,.3);color:#a78bfa;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0">
+              ⬇️ PPTX
+            </button>
+          </div>`;
+        }
+        return "";
+      }).join("")}
+    </div>`;
+  msgsEl.appendChild(assetDiv);
+}
+
+async function redownloadPresentation(assetId){
+  const {data:asset} = await sb.from("chat_assets").select("*").eq("id",assetId).single();
+  if(!asset||!asset.content) return;
+  const data = JSON.parse(asset.content);
+  await downloadAsPPTX(data.slides||[], data.title||"Sunu", data.age||9);
+}
+
 
 
 // ── PIN ile geri çıkış ───────────────────────────────────────
@@ -3651,7 +3667,6 @@ function detectImageRequest(text){
 async function addImageToChat(prompt){
   const msgsEl = el("messages"); if(!msgsEl) return;
 
-  // Loading placeholder
   const loadRow = document.createElement("div");
   loadRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
   loadRow.innerHTML = `
@@ -3667,19 +3682,23 @@ async function addImageToChat(prompt){
 
   const imgUrl = await generateImage(prompt);
   loadRow.remove();
-
   if(!imgUrl){ addMsg("bibi","Görsel üretemedi 🙈"); return; }
 
-  // Görseli göster — img onload bekle
+  // Supabase'e kaydet
+  const title = prompt.slice(0,50);
+  saveAsset("image", title, imgUrl, null);
+
+  const assetId = Date.now();
   const imgRow = document.createElement("div");
   imgRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
   imgRow.innerHTML = `
     <div style="flex-shrink:0;width:36px;height:36px">${bibiFaceSVG("happy",36)}</div>
-    <div style="max-width:80%">
-      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px" alt="Bibi'nin çizimi" onload="this.parentElement.parentElement.scrollIntoView({behavior:'smooth'})"/>
+    <div style="max-width:85%">
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">${title}</div>
+      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px;cursor:pointer" alt="Görsel" onclick="this.requestFullscreen?.()"/>
       <div style="display:flex;gap:8px">
-        <a href="${imgUrl}" download="bibi-gorseli.png" target="_blank" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer;text-decoration:none">⬇️ İndir</a>
-        <button onclick="pdfImages.push('${imgUrl}');showNotif('📄 PDF\\'e eklendi!')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e ekle</button>
+        <button onclick="downloadImageAsPNG('${imgUrl}','bibi-${title.slice(0,15).replace(/\s/g,'-')}.png')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">⬇️ PNG İndir</button>
+        <button onclick="pdfImages.push('${imgUrl}');showNotif('📄 PDF\\'e eklendi!')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e Ekle</button>
       </div>
     </div>`;
   msgsEl.appendChild(imgRow);
@@ -3807,7 +3826,158 @@ function addImageRequest(){
 }
 
 
-// ── Görüntü analizi (Groq Vision) ───────────────────────────
+// ── Chat Asset Kaydetme ───────────────────────────────────────
+async function saveAsset(type, title, url, content){
+  if(!currentChild || !sessionId) return null;
+  const {data} = await sb.from("chat_assets").insert({
+    session_id: sessionId,
+    child_id: currentChild.id,
+    type, title,
+    url: url||null,
+    content: content ? JSON.stringify(content) : null
+  }).select().single();
+  return data;
+}
+
+async function loadSessionAssets(sid){
+  const {data} = await sb.from("chat_assets")
+    .select("*")
+    .eq("session_id", sid)
+    .order("created_at", {ascending:true});
+  return data||[];
+}
+
+// ── Görsel indirme (PNG) ──────────────────────────────────────
+async function downloadImageAsPNG(url, filename){
+  const notif = document.createElement("div");
+  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500";
+  notif.textContent = "⬇️ İndiriliyor...";
+  document.body.appendChild(notif);
+  try{
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename||"bibi-gorseli.png";
+    a.click();
+    notif.textContent = "✅ İndirildi!";
+    setTimeout(()=>notif.remove(), 1500);
+  }catch(e){
+    // Direkt link ile dene
+    const a = document.createElement("a");
+    a.href = url; a.download = filename||"bibi-gorseli.png";
+    a.target = "_blank"; a.click();
+    notif.remove();
+  }
+}
+
+// ── PPTX Üretme ──────────────────────────────────────────────
+async function downloadAsPPTX(slides, title, age){
+  // pptxgenjs yükle
+  if(!window.PptxGenJS){
+    const notif = showNotif("📊 PPTX hazırlanıyor...", false);
+    await new Promise((res,rej)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/pptxgenjs/3.12.0/pptxgen.bundle.js";
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const pptx = new window.PptxGenJS();
+  pptx.layout = "LAYOUT_16x9";
+  pptx.title = title;
+
+  const colors = age<=8
+    ?{bg:"1A3A5C", accent:"0D9B7E", text:"FFFFFF", sub:"AADDCC"}
+    :age<=12
+    ?{bg:"1E2D3D", accent:"2563EB", text:"FFFFFF", sub:"93C5FD"}
+    :{bg:"0F172A", accent:"7C3AED", text:"FFFFFF", sub:"C4B5FD"};
+
+  // Kapak slaytı
+  const cover = pptx.addSlide();
+  cover.background = {color: colors.bg};
+  cover.addText(title, {
+    x:0.5, y:1.5, w:9, h:1.5,
+    fontSize: age<=8?36:age<=12?32:28,
+    bold:true, color:colors.text, align:"center"
+  });
+  cover.addText(`${currentChild?.name||""} • Bibi ile hazırlandı`, {
+    x:0.5, y:4, w:9, h:0.5,
+    fontSize:14, color:colors.sub, align:"center"
+  });
+
+  // İçerik slaytları
+  slides.forEach((s,i)=>{
+    const slide = pptx.addSlide();
+    slide.background = {color: colors.bg};
+
+    // Başlık
+    slide.addText(s.title||`Slayt ${i+1}`, {
+      x:0.4, y:0.3, w:9.2, h:0.8,
+      fontSize: age<=8?24:age<=12?22:20,
+      bold:true, color:colors.text,
+      border:{type:"none"},
+      line:{color:colors.accent, width:2, dashType:"solid"}
+    });
+
+    // Slayt no
+    slide.addText(`${i+1}/${slides.length}`, {
+      x:8.5, y:0.1, w:1, h:0.3,
+      fontSize:10, color:colors.sub, align:"right"
+    });
+
+    // Maddeler
+    const points = (s.points||[]).map(p=>({
+      text: p,
+      options:{bullet:{type:"bullet",characterCode:"25B8",color:colors.accent}, color:colors.text, fontSize:age<=8?16:age<=12?14:13, paraSpaceBefore:6}
+    }));
+    if(points.length>0){
+      slide.addText(points, {x:0.4, y:1.3, w:5.5, h:4.2, valign:"top"});
+    }
+
+    // Sağ görsel
+    if(s.imageUrl){
+      try{
+        slide.addImage({path:s.imageUrl, x:6.1, y:1.1, w:3.5, h:3.5, sizing:{type:"cover"}});
+      }catch(e){}
+    }
+
+    // Fun fact
+    if(s.fun_fact){
+      slide.addText(`💡 ${s.fun_fact}`, {
+        x:0.4, y:5.6, w:9.2, h:0.6,
+        fontSize:11, color:colors.sub, italic:true
+      });
+    }
+  });
+
+  // Bitiş slaytı
+  const end = pptx.addSlide();
+  end.background = {color: colors.bg};
+  end.addText(age<=8?"🌟 Harika İş!":age<=12?"✅ Tebrikler!":"Sunum Tamamlandı", {
+    x:0.5, y:2, w:9, h:1.2,
+    fontSize:32, bold:true, color:colors.text, align:"center"
+  });
+  end.addText("Bibi ile öğrenmek eğlenceli!", {
+    x:0.5, y:3.5, w:9, h:0.5,
+    fontSize:14, color:colors.sub, align:"center"
+  });
+
+  await pptx.writeFile({fileName:`${title.slice(0,20)}-${currentChild?.name||""}.pptx`});
+  showNotif("✅ PPTX indirildi!");
+}
+
+function showNotif(msg, autoRemove=true){
+  const n = document.createElement("div");
+  n.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0D9B7E;color:white;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease";
+  n.textContent = msg;
+  document.body.appendChild(n);
+  if(autoRemove) setTimeout(()=>n.remove(), 2000);
+  return n;
+}
+
+
 async function analyzeImageWithGroq(base64Image, prompt){
   const res = await fetch(GROQ_URL, {
     method:"POST",
@@ -4246,122 +4416,25 @@ JSON formatında döndür:
   const slideImgs = parsed.slides.map((s,i)=> makeImgUrl(s.image_query||s.title, i*37+200));
 
   notif.remove();
-  addMsg("bibi", `"${topic}" sunusu hazırlandı! 📊 ${parsed.slides.length} slayt + görseller oluşturuldu, indiriliyor...`);
+  addMsg("bibi", `"${topic}" sunusu hazırlandı! 📊 ${parsed.slides.length} slayt oluşturuldu, PPTX indiriliyor...`);
 
-  const sc = ["<","/script>"].join("");
-  const scO = ["<","script>"].join("");
+  // Slaytlara görsel URL ekle
+  const slidesWithImages = parsed.slides.map((s,i)=>({...s, imageUrl:slideImgs[i]}));
 
-  const overlayOpacity = age<=8 ? "0.55" : age<=12 ? "0.65" : "0.72";
-  const overlayColor = age<=8 ? "rgba(10,20,40," : age<=12 ? "rgba(5,15,30," : "rgba(0,5,20,";
+  // Supabase'e kaydet
+  saveAsset("presentation", topic, null, {
+    title: parsed.title||topic,
+    subtitle: parsed.subtitle||"",
+    slides: slidesWithImages,
+    ending: parsed.ending||"",
+    coverImage: coverImg,
+    age
+  });
 
-  const slideHTML = parsed.slides.map((s,i)=>{
-    const bg = slideImgs[i];
-    const pointsHTML = (s.points||[]).map(p=>
-      `<li style="font-size:${age<=8?"18px":age<=12?"16px":"15px"};line-height:1.6;display:flex;gap:10px;align-items:flex-start;margin-bottom:10px">
-        <span style="flex-shrink:0;margin-top:3px">${style.bullet}</span>
-        <span>${p}</span>
-      </li>`
-    ).join("");
-
-    const funFact = s.fun_fact ? `
-      <div style="margin-top:12px;padding:8px 12px;background:rgba(255,255,255,.1);border-radius:8px;border-left:3px solid rgba(255,255,255,.4);font-size:12px;opacity:.85">
-        💡 ${s.fun_fact}
-      </div>` : "";
-
-    return `
-    <div class="slide">
-      <!-- Sol: Görsel -->
-      <div style="position:absolute;right:0;top:0;width:42%;height:100%;overflow:hidden">
-        <img src="${bg}" style="width:100%;height:100%;object-fit:cover" loading="lazy"/>
-        <div style="position:absolute;inset:0;background:linear-gradient(to right, ${overlayColor}0.95) 0%, ${overlayColor}0.3) 100%)"></div>
-      </div>
-      <!-- Sağ: İçerik -->
-      <div style="position:relative;z-index:1;width:60%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:44px 40px;background:${overlayColor}0.85)">
-        <div style="font-size:10px;opacity:.4;margin-bottom:10px;letter-spacing:2px;text-transform:uppercase">${parsed.title} — ${i+1}/${parsed.slides.length}</div>
-        <h2 style="font-size:${age<=8?"26px":age<=12?"22px":"20px"};font-weight:900;margin-bottom:16px;line-height:1.2;text-shadow:0 2px 6px rgba(0,0,0,.4);padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.15)">${s.title}</h2>
-        <ul style="list-style:none">${pointsHTML}</ul>
-        ${funFact}
-      </div>
-    </div>`;
-  }).join("");
-
-  const html = [
-    '<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8"/>',
-    '<meta name="viewport" content="width=device-width,initial-scale=1"/>',
-    `<title>${parsed.title}</title>`,
-    '<style>',
-    '*{margin:0;padding:0;box-sizing:border-box}',
-    'body{font-family:"Segoe UI",Tahoma,sans-serif;background:#000;color:#fff;height:100vh;overflow:hidden}',
-    '.slide{display:none;position:relative;height:100vh;background-size:cover;background-position:center}',
-    '.slide.active{display:block}',
-    '.nav{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);display:flex;gap:8px;align-items:center;z-index:100;background:rgba(0,0,0,.5);padding:8px 14px;border-radius:20px;backdrop-filter:blur(12px)}',
-    'button{padding:7px 18px;border:1px solid rgba(255,255,255,.25);border-radius:14px;background:rgba(255,255,255,.12);color:#fff;font-size:13px;font-weight:700;cursor:pointer}',
-    'button:hover{background:rgba(255,255,255,.25)}',
-    '.counter{color:rgba(255,255,255,.6);font-size:12px;min-width:70px;text-align:center}',
-    '.loading-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#111;font-size:14px;opacity:.4}',
-    '@keyframes fi{from{opacity:0}to{opacity:1}}',
-    '.slide.active{animation:fi .4s ease}',
-    '</style></head><body>',
-
-    // Kapak
-    `<div class="slide active" style="background-image:url('${coverImg}');background-size:cover;background-position:center">`,
-    `<div style="position:absolute;inset:0;background:${overlayColor}0.6)"></div>`,
-    `<div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">`,
-    `<h1 style="font-size:${age<=8?"52px":age<=12?"44px":"38px"};font-weight:900;margin-bottom:16px;text-shadow:0 4px 16px rgba(0,0,0,.6);line-height:1.1">${parsed.title}</h1>`,
-    `<p style="font-size:${age<=8?"20px":"17px"};opacity:.75;max-width:500px;text-shadow:0 2px 8px rgba(0,0,0,.5)">${parsed.subtitle||""}</p>`,
-    `<p style="font-size:13px;opacity:.4;margin-top:24px">${currentChild?.name||""} • ${new Date().toLocaleDateString("tr-TR")} • Bibi ile hazırlandı</p>`,
-    '</div></div>',
-
-    slideHTML,
-
-    // Bitiş
-    `<div class="slide" style="background-image:url('${coverImg}');background-size:cover;background-position:center">`,
-    `<div style="position:absolute;inset:0;background:${overlayColor}0.7)"></div>`,
-    `<div style="position:relative;z-index:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">`,
-    `<div style="font-size:${age<=8?"64px":"52px"};margin-bottom:20px">${age<=8?"🌟":"✅"}</div>`,
-    `<h2 style="font-size:${age<=8?"36px":age<=12?"30px":"26px"};font-weight:900;margin-bottom:14px;text-shadow:0 2px 8px rgba(0,0,0,.5)">${age<=8?"Harika İş!":age<=12?"Tebrikler!":"Sunum Tamamlandı"}</h2>`,
-    `<p style="font-size:${age<=8?"17px":"15px"};opacity:.7;max-width:400px;line-height:1.6;text-shadow:0 1px 4px rgba(0,0,0,.5)">${parsed.ending||""}</p>`,
-    '</div></div>',
-
-    '<div class="nav">',
-    '<button onclick="p()">← Önceki</button>',
-    `<span class="counter" id="c">1 / ${parsed.slides.length+2}</span>`,
-    '<button onclick="n()">Sonraki →</button>',
-    '</div>',
-
-    scO,
-    'var i=0,sl=document.querySelectorAll(".slide");',
-    'function show(x){sl.forEach(function(e){e.classList.remove("active")});sl[x].classList.add("active");document.getElementById("c").textContent=(x+1)+" / "+sl.length;}',
-    'function n(){if(i<sl.length-1){i++;show(i);}}',
-    'function p(){if(i>0){i--;show(i);}}',
-    'document.addEventListener("keydown",function(e){',
-    'if(e.key==="ArrowRight"||e.key===" "){e.preventDefault();n();}',
-    'if(e.key==="ArrowLeft"){e.preventDefault();p();}',
-    '});',
-    sc,'</body></html>'
-  ].join("\n");
-
-  const blob = new Blob([html],{type:"text/html"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download=`${topic.slice(0,20)}-sunu-${currentChild?.name||""}.html`; a.click();
-  URL.revokeObjectURL(url);
-  showNotif("✅ Sunu indirildi!");
+  // PPTX olarak indir
+  await downloadAsPPTX(slidesWithImages, parsed.title||topic, age);
 }
 
-  const notif = document.createElement("div");
-  notif.id = "pres-notif";
-  notif.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#7C3AED;color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;z-index:500;animation:fadeUp .3s ease;text-align:center;min-width:220px";
-  notif.textContent = "🔍 Konu araştırılıyor...";
-  document.body.appendChild(notif);
-
-function closeActionMenu(){
-  const menu = document.getElementById("action-menu");
-  const btn = document.getElementById("action-btn");
-  if(menu) menu.style.display = "none";
-  if(btn){ btn.style.background="rgba(255,255,255,.12)"; btn.textContent="+"; }
-  document.removeEventListener("click", _closeMenuOutside);
-}
 
 function addImageRequest(){
   // Input'a görsel isteği yaz
