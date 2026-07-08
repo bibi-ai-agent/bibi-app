@@ -93,8 +93,9 @@ async function generateImage(prompt){
   return url;
 }
 async function callAI(systemPrompt, messages, maxTokens=1000){
-  const apiMessages = [];
-  if(systemPrompt) apiMessages.push({role:"system", content:systemPrompt});
+  const turkishRule = "KRİTİK: Her zaman sadece Türkçe kullan. İngilizce, Çince, Rusça veya başka herhangi bir dil kesinlikle yasak.";
+  const finalSystem = systemPrompt ? `${turkishRule}\n\n${systemPrompt}` : turkishRule;
+  const apiMessages = [{role:"system", content: finalSystem}];
   (messages||[]).forEach(m => apiMessages.push({role: m.role||"user", content: m.content}));
 
   const res = await fetch(GROQ_URL, {
@@ -1136,21 +1137,21 @@ async function analyzeEmotionAndInterest(childId, sessionId, text){
   // Son 5 mesajı al
   const recentMsgs = messages.slice(-10).map(m=>m.t).join("\n");
 
-  const prompt = `Aşağıdaki çocuk mesajlarını analiz et ve JSON formatında yanıt ver.
-Çocuğun yaşı: ${currentChild?.age||9}
+  const prompt = `Aşağıdaki Türkçe çocuk mesajlarını analiz et.
 
-Mesajlar:
-${recentMsgs}
+Yaş: ${currentChild?.age||9}
+Mesajlar: ${recentMsgs}
 
-Şunları belirle:
-1. emotion: Baskın duygu (sadece biri seç: happy/excited/curious/calm/sad/frustrated/bored/anxious)
-2. interest_area: Baskın ilgi alanı (sadece biri seç: sanat/spor/bilim/müzik/oyun/doğa/sosyal/teknoloji/edebiyat/matematik/genel)
-3. confidence: Bu etiketlere güven skoru 0-100
-4. character_hint: Kısa karakter gözlemi (max 20 kelime Türkçe)
-5. engagement: Yüksek/Orta/Düşük (konuşmaya katılım seviyesi)
+SADECE şu JSON formatında yanıt ver, başka hiçbir şey yazma, Türkçe dışında dil kullanma:
+{"emotion":"[DEĞER]","interest_area":"[DEĞER]","confidence":[0-100],"character_hint":"[TÜRKÇE]","engagement":"[DEĞER]"}
 
-SADECE JSON yanıt ver:
-{"emotion":"...","interest_area":"...","confidence":85,"character_hint":"...","engagement":"..."}`;
+Zorunlu değerler:
+- emotion: happy / excited / curious / calm / sad / frustrated / bored / anxious (sadece bunlardan biri)
+- interest_area: sanat / spor / bilim / müzik / oyun / doğa / sosyal / teknoloji / edebiyat / matematik / genel (sadece bunlardan biri)
+- character_hint: maksimum 12 kelime, YALNIZCA Türkçe
+- engagement: Yüksek / Orta / Düşük
+
+Örnek: {"emotion":"happy","interest_area":"bilim","confidence":85,"character_hint":"Meraklı ve soru sormayı seviyor","engagement":"Yüksek"}`;
 
   try{
     let raw = await callAI(null, [{role:"user",content:prompt}], 200);
@@ -1573,10 +1574,11 @@ SOKRATİK ÖDEV KURALI
 Ödev/problem sorularında ASLA direkt cevap verme. Adım adım yönlendir.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
-DİL
+DİL — KRİTİK KURAL
 ━━━━━━━━━━━━━━━━━━━━━━━━
-• Varsayılan: Türkçe
-• ${name} başka dil yazarsa o dilde yanıtla
+• Her zaman %100 Türkçe konuş — İngilizce, Çince, Rusça, Arapça, başka hiçbir dil KULLANMA
+• Yabancı kelime, emoji açıklaması veya teknik terim bile olsa Türkçe karşılığını kullan
+• ${name} başka dilde yazsa bile sen Türkçe yanıt ver
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 GÜVENLİK
@@ -2326,7 +2328,14 @@ async function screenReport(child){
   const totalEmotions = emotions.length;
 
   const eEmoji={happy:"😊",excited:"🤩",curious:"🔍",calm:"😌",sad:"😢",frustrated:"😤",bored:"😴",anxious:"😰"};
-  const eLabel={happy:"Mutlu",excited:"Heyecanlı",curious:"Meraklı",calm:"Sakin",sad:"Üzgün",frustrated:"Sinirli",bored:"Sıkılmış",anxious:"Endişeli"};
+  const eLabel={
+    happy:"Mutlu",excited:"Heyecanlı",curious:"Meraklı",calm:"Sakin",
+    sad:"Üzgün",frustrated:"Sinirli",bored:"Sıkılmış",anxious:"Endişeli",
+    // Fallback'ler — AI yanlış değer verirse
+    positive:"Olumlu",negative:"Olumsuz",neutral:"Dengeli",
+    angry:"Sinirli",fear:"Korkmuş",surprise:"Şaşırmış",joy:"Neşeli",
+    content:"Memnun",confused:"Kafası Karışık",tired:"Yorgun"
+  };
   const eColor={happy:"#16A34A",excited:"#D97706",curious:"#2563EB",calm:"#7C3AED",sad:"#64748b",frustrated:"#DC2626",bored:"#6B7280",anxious:"#EA580C"};
   const eBg={happy:"#dcfce7",excited:"#fef3c7",curious:"#dbeafe",calm:"#ede9fe",sad:"#f1f5f9",frustrated:"#fee2e2",bored:"#f3f4f6",anxious:"#ffedd5"};
   const iIcon={sanat:"🎨",spor:"⚽",bilim:"🔬",müzik:"🎵",oyun:"🎮",doğa:"🌿",sosyal:"👥",teknoloji:"💻",edebiyat:"📚",matematik:"📐",genel:"🌍"};
@@ -2437,7 +2446,7 @@ async function screenReport(child){
             const pct=Math.round(c/totalEmotions*100);
             return `<div style="display:flex;align-items:center;gap:4px;background:${eBg[e]||"#f3f4f6"};border-radius:20px;padding:4px 10px">
               <span style="font-size:13px">${eEmoji[e]||"😐"}</span>
-              <span style="font-size:12px;font-weight:700;color:${eColor[e]||"#6B7280"}">${eLabel[e]||e}</span>
+              <span style="font-size:12px;font-weight:700;color:${eColor[e]||"#6B7280"}">${eLabel[e]||"Belirsiz"}</span>
               <span style="font-size:11px;color:#9CA3AF">%${pct}</span>
             </div>`;
           }).join("")}
