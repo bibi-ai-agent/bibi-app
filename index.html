@@ -109,8 +109,8 @@ Kurallar:
 
   const safePrompt = encodeURIComponent(`${englishPrompt}, ${stylePrompt}, high quality`);
   const seed = Math.floor(Math.random()*1000000);
-  const url = `https://image.pollinations.ai/prompt/${safePrompt}?width=512&height=512&seed=${seed}&nologo=true&model=turbo`;
-  return url;
+  // JPEG — daha hızlı yükleme ve geniş tarayıcı desteği
+  return `https://image.pollinations.ai/prompt/${safePrompt}?width=512&height=512&seed=${seed}&nologo=true&model=turbo&format=jpeg`;
 }
 async function callAI(systemPrompt, messages, maxTokens=1000){
   const turkishRule = "KRİTİK: Her zaman sadece Türkçe kullan. İngilizce, Çince, Rusça veya başka herhangi bir dil kesinlikle yasak.";
@@ -3744,20 +3744,25 @@ async function addImageToChat(prompt){
   loadRow.remove();
   if(!imgUrl){ addMsg("bibi","Görsel üretemedi 🙈"); return; }
 
-  // Supabase'e kaydet
   const title = prompt.slice(0,50);
   saveAsset("image", title, imgUrl, null);
 
-  const assetId = Date.now();
   const imgRow = document.createElement("div");
   imgRow.style.cssText = "display:flex;margin-bottom:14px;animation:fadeUp .3s ease;gap:8px;align-items:flex-end";
   imgRow.innerHTML = `
     <div style="flex-shrink:0;width:36px;height:36px">${bibiFaceSVG("happy",36)}</div>
     <div style="max-width:85%">
       <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:4px">${title}</div>
-      <img src="${imgUrl}" style="border-radius:12px;max-width:100%;box-shadow:0 4px 16px rgba(0,0,0,.2);display:block;margin-bottom:8px;cursor:pointer" alt="Görsel" onclick="this.requestFullscreen?.()"/>
+      <div id="img-wrap-${Date.now()}" style="border-radius:12px;overflow:hidden;background:rgba(255,255,255,.1);min-height:80px;display:flex;align-items:center;justify-content:center;margin-bottom:8px">
+        <img src="${imgUrl}"
+          style="border-radius:12px;max-width:100%;display:block;cursor:pointer"
+          alt="Bibi çizimi"
+          onload="this.parentElement.style.minHeight='0'"
+          onerror="this.parentElement.innerHTML='<div style=\\'padding:12px;color:rgba(255,255,255,.4);font-size:12px;text-align:center\\'>Görsel yüklenemedi 🙈<br/><a href=\\'${imgUrl}\\' target=\\'_blank\\' style=\\'color:#4ade80\\'>Tarayıcıda aç →</a></div>'"
+          onclick="window.open('${imgUrl}','_blank')"/>
+      </div>
       <div style="display:flex;gap:8px">
-        <button onclick="downloadImageAsPNG('${imgUrl}','bibi-${title.slice(0,15).replace(/\s/g,'-')}.png')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">⬇️ PNG İndir</button>
+        <button onclick="downloadImageAsPNG('${imgUrl}','${title.slice(0,15).replace(/\s/g,'-')}.jpg')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#0D9B7E;font-size:12px;font-weight:700;cursor:pointer">⬇️ JPG İndir</button>
         <button onclick="pdfImages.push('${imgUrl}');showNotif('📄 PDF\\'e eklendi!')" style="padding:6px 12px;border-radius:8px;border:none;background:rgba(255,255,255,.9);color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer">📄 PDF'e Ekle</button>
       </div>
     </div>`;
