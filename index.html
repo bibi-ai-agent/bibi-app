@@ -147,8 +147,14 @@ let isListening = false, recognition = null;
 // ══════════════════════════════════════════════════════════════
 const R = document.getElementById("root");
 function render(html){
-  // Ekran değişince açık kalan bildirimleri temizle
-  ["pres-notif","content-creator-modal","voice-selector-modal","crop-modal","forgot-overlay","forgot-pin-overlay"].forEach(id=>{
+  // Ekran değişince sesi durdur
+  if(currentAudio){ currentAudio.pause(); currentAudio=null; }
+  window.speechSynthesis?.cancel();
+  speechActive=false; speechPaused=false;
+  // Mic durdur
+  if(isListening){ try{recognition?.stop();}catch(e){} isListening=false; }
+  // Açık kalan bildirimleri temizle
+  ["pres-notif","content-creator-modal","voice-selector-modal","crop-modal","forgot-overlay","forgot-pin-overlay","hw-check-bar","action-menu"].forEach(id=>{
     document.getElementById(id)?.remove();
   });
   R.innerHTML = html;
@@ -3015,11 +3021,14 @@ function showAddForm(){
   if(!form||!btn) return;
   form.classList.remove("hidden");
   btn.classList.add("hidden");
-
+  // Form göründükten sonra scroll et
+  setTimeout(()=>{
+    form.scrollIntoView({behavior:"smooth", block:"start"});
+  }, 100);
   // Dışarı tıklayınca kapat
   setTimeout(()=>{
     document.addEventListener("click", _outsideAddFormHandler);
-  }, 100);
+  }, 200);
 }
 
 function _outsideAddFormHandler(e){
@@ -3707,15 +3716,25 @@ function toggleMic(){
     const err=el("mic-err"); if(err){err.textContent="Tarayıcın sesli girişi desteklemiyor 😔";err.style.display="block";setTimeout(()=>err.style.display="none",3000);}
     return;
   }
+
+  // Aktif ses varsa durdur
+  if(currentAudio){ currentAudio.pause(); currentAudio=null; }
+  window.speechSynthesis?.cancel();
+  speechActive=false;
+
+  try{ recognition?.abort(); }catch(e){}
+
   recognition = new SR();
   recognition.lang = "tr-TR";
   recognition.continuous = false;
   recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
 
   const btn = el("mic-btn");
+  let finalSent = false;
 
   recognition.onstart = ()=>{
-    isListening=true;
+    isListening=true; finalSent=false;
     if(btn){ btn.style.background="rgba(239,68,68,.4)"; btn.style.boxShadow="0 0 16px rgba(239,68,68,.5)"; }
     const inp=el("chat-input"); if(inp) inp.placeholder="Dinleniyor... 🎤";
   };
@@ -3728,16 +3747,21 @@ function toggleMic(){
     }
     const inp=el("chat-input");
     if(inp) inp.value = final||interim;
-    if(final){
+    if(final && !finalSent){
+      finalSent=true;
       recognition.stop();
-      setTimeout(()=>sendMessage(true), 200); // fromVoice=true
+      setTimeout(()=>sendMessage(true), 100);
     }
   };
 
   recognition.onerror = e=>{
-    isListening=false;
-    if(btn){ btn.style.background="rgba(255,255,255,.12)"; btn.style.boxShadow="none"; }
+    console.log("Mic hata:", e.error);
+    isListening=false; finalSent=false;
+    if(btn){ btn.style.background=currentChild?.age<=8?"rgba(74,222,128,.3)":"rgba(255,255,255,.12)"; btn.style.boxShadow="none"; }
     const inp=el("chat-input"); if(inp) inp.placeholder="Bibi'ye yaz veya konuş...";
+    if(e.error==="no-speech"||e.error==="audio-capture"){
+      const err=el("mic-err"); if(err){err.textContent="Ses algılanamadı, tekrar dene 🎤";err.style.display="block";setTimeout(()=>err.style.display="none",2000);}
+    }
   };
 
   recognition.onend = ()=>{
@@ -3746,7 +3770,7 @@ function toggleMic(){
     const inp=el("chat-input"); if(inp) inp.placeholder="Bibi'ye yaz veya konuş...";
   };
 
-  recognition.start();
+  try{ recognition.start(); }catch(e){ console.error("Mic başlatma hatası:", e); isListening=false; }
 }
 
 function stopMic(){
@@ -4477,7 +4501,7 @@ async function speakElevenLabs(text){
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44);
     speechActive=true; updateVoiceBtn();
 
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}/stream`,{
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,{
       method:"POST",
       headers:{
         "Content-Type":"application/json",
@@ -4487,41 +4511,40 @@ async function speakElevenLabs(text){
         text,
         model_id: "eleven_multilingual_v2",
         voice_settings:{
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.3,
-          use_speaker_boost: true
-        }
+          stability: 0.4,
+          similarity_boost: 0.8,
+          style: 0.2,
+          use_speaker_boost: false
+        },
+        output_format: "mp3_22050_32"
       })
     });
 
-    if(!res.ok){ throw new Error("ElevenLabs hata: "+res.status); }
+    if(!res.ok) throw new Error("ElevenLabs hata: "+res.status);
 
     const blob = await res.blob();
+    // Önceki ses hâlâ duruyorsa iptal
+    if(!speechActive){ return; }
     const url = URL.createObjectURL(blob);
     const audio = new Audio(url);
+    audio.preload = "auto";
     currentAudio = audio;
 
-    audio.onended = () => {
-      speechActive=false; speechPaused=false;
-      URL.revokeObjectURL(url); currentAudio=null;
-      setExpr("idle"); setStatus(`${currentChild?.name||""} ile`,"#4ade80");
-      const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
-      updateVoiceBtn();
-    };
-    audio.onerror = () => {
-      speechActive=false; currentAudio=null;
-      setExpr("idle"); updateVoiceBtn();
-      // Fallback: tarayıcı sesine geç
-      speakBrowser(text);
-    };
-
-    audio.play();
+    await new Promise((resolve)=>{
+      audio.oncanplaythrough = ()=>{ audio.play().catch(()=>{}); };
+      audio.onended = ()=>{
+        speechActive=false; speechPaused=false;
+        URL.revokeObjectURL(url); currentAudio=null;
+        setExpr("idle"); setStatus(`${currentChild?.name||""} ile`,"#4ade80");
+        const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("idle",44);
+        updateVoiceBtn(); resolve();
+      };
+      audio.onerror = ()=>{ resolve(); };
+      audio.load();
+    });
   }catch(e){
     console.error("ElevenLabs hatası:", e);
-    speechActive=false; updateVoiceBtn();
-    setExpr("idle");
-    // Fallback
+    speechActive=false; updateVoiceBtn(); setExpr("idle");
     speakBrowser(text);
   }
 }
