@@ -3972,46 +3972,58 @@ async function downloadAsPPTX(slides, title, age){
     fontSize:14, color:colors.sub, align:"center"
   });
 
-  // İçerik slaytları
+  // İçerik slaytları — görsel fetch yok, sadece metin (hızlı)
   slides.forEach((s,i)=>{
     const slide = pptx.addSlide();
     slide.background = {color: colors.bg};
 
-    // Başlık
-    slide.addText(s.title||`Slayt ${i+1}`, {
-      x:0.4, y:0.3, w:9.2, h:0.8,
-      fontSize: age<=8?24:age<=12?22:20,
-      bold:true, color:colors.text,
-      border:{type:"none"},
-      line:{color:colors.accent, width:2, dashType:"solid"}
+    // Üst renk şeridi
+    slide.addShape(pptx.ShapeType.rect, {
+      x:0, y:0, w:"100%", h:0.06,
+      fill:{color:colors.accent}
     });
 
-    // Slayt no
-    slide.addText(`${i+1}/${slides.length}`, {
-      x:8.5, y:0.1, w:1, h:0.3,
+    // Başlık
+    slide.addText(s.title||`Slayt ${i+1}`, {
+      x:0.4, y:0.2, w:9.2, h:0.9,
+      fontSize: age<=8?26:age<=12?23:20,
+      bold:true, color:colors.text
+    });
+
+    // Ayırıcı çizgi
+    slide.addShape(pptx.ShapeType.line, {
+      x:0.4, y:1.15, w:9.2, h:0,
+      line:{color:colors.accent, width:1.5}
+    });
+
+    // Slayt no (sağ üst)
+    slide.addText(`${i+1} / ${slides.length}`, {
+      x:8, y:0.1, w:1.8, h:0.35,
       fontSize:10, color:colors.sub, align:"right"
     });
 
     // Maddeler
     const points = (s.points||[]).map(p=>({
       text: p,
-      options:{bullet:{type:"bullet",characterCode:"25B8",color:colors.accent}, color:colors.text, fontSize:age<=8?16:age<=12?14:13, paraSpaceBefore:6}
+      options:{
+        bullet:{type:"bullet", characterCode:"25B8", color:colors.accent},
+        color:colors.text,
+        fontSize:age<=8?17:age<=12?15:14,
+        paraSpaceBefore:8
+      }
     }));
     if(points.length>0){
-      slide.addText(points, {x:0.4, y:1.3, w:5.5, h:4.2, valign:"top"});
+      slide.addText(points, {x:0.4, y:1.3, w:9.2, h:4, valign:"top"});
     }
 
-    // Sağ görsel
-    if(s.imageUrl){
-      try{
-        slide.addImage({path:s.imageUrl, x:6.1, y:1.1, w:3.5, h:3.5, sizing:{type:"cover"}});
-      }catch(e){}
-    }
-
-    // Fun fact
+    // Fun fact kutusu
     if(s.fun_fact){
+      slide.addShape(pptx.ShapeType.rect, {
+        x:0.4, y:5.5, w:9.2, h:0.7,
+        fill:{color:"00000030"}, line:{color:colors.accent, width:1}
+      });
       slide.addText(`💡 ${s.fun_fact}`, {
-        x:0.4, y:5.6, w:9.2, h:0.6,
+        x:0.5, y:5.55, w:9, h:0.6,
         fontSize:11, color:colors.sub, italic:true
       });
     }
