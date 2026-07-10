@@ -75,10 +75,10 @@
 const SUPABASE_URL  = "https://adguyijnyoicmluhursw.supabase.co";
 const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFkZ3V5aWpueW9pY21sdWh1cnN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1NTQwMjAsImV4cCI6MjA5ODEzMDAyMH0.uuH3Jb-4a3ZEquduTmdb9Xv6bWPcU_gXd_5DuxM82G4";
 const OPENROUTER_KEY = "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";
-const GROQ_KEY = "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";
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_KEY = ""; // Proxy kullanılıyor
+const GROQ_URL = "/api/chat";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent";
-const HF_KEY = "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";
+const HF_KEY = ""; // Proxy kullanılıyor
 const HF_MODEL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2-1";
 
 // Görsel üretme — Pollinations.ai (ücretsiz, kısıtlama yok)
@@ -107,10 +107,9 @@ Kurallar:
     .replace(/^\*+|\*+$/g,"")
     .trim();
 
-  const safePrompt = encodeURIComponent(`${englishPrompt}, ${stylePrompt}, high quality`);
-  const seed = Math.floor(Math.random()*1000000);
-  // JPEG — daha hızlı yükleme ve geniş tarayıcı desteği
-  return `https://image.pollinations.ai/prompt/${safePrompt}?width=512&height=512&seed=${seed}&nologo=true&model=turbo&format=jpeg`;
+  const safePrompt = `${englishPrompt}, ${stylePrompt}, high quality`;
+  // Görsel proxy üzerinden — key frontend'de görünmez
+  return `/api/image?prompt=${encodeURIComponent(safePrompt)}&t=${Date.now()}`;
 }
 async function callAI(systemPrompt, messages, maxTokens=1000){
   const turkishRule = "KRİTİK: Her zaman sadece Türkçe kullan. İngilizce, Çince, Rusça veya başka herhangi bir dil kesinlikle yasak.";
@@ -121,8 +120,7 @@ async function callAI(systemPrompt, messages, maxTokens=1000){
   const res = await fetch(GROQ_URL, {
     method:"POST",
     headers:{
-      "Content-Type":"application/json",
-      "Authorization": `Bearer ${GROQ_KEY}`
+      "Content-Type":"application/json"
     },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
@@ -138,7 +136,7 @@ async function callAI(systemPrompt, messages, maxTokens=1000){
 }
 
 
-const ELEVENLABS_KEY = "sk_41588dc49a5f53e0da60804f8b4565d5efa63c883ef2853c";
+const ELEVENLABS_KEY = ""; // Proxy kullanılıyor
 
 // ElevenLabs sesleri — 2 kadın, 2 erkek
 const ELEVENLABS_VOICES = [
@@ -4637,22 +4635,18 @@ async function speakElevenLabs(text){
     const wrap=el("bibi-face-wrap"); if(wrap) wrap.innerHTML=bibiFaceSVG("talking",44);
     speechActive=true; updateVoiceBtn();
 
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,{
+    const res = await fetch("/api/tts",{
       method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "xi-api-key": ELEVENLABS_KEY
-      },
+      headers:{"Content-Type":"application/json"},
       body: JSON.stringify({
+        voiceId: selectedVoiceId,
         text,
-        model_id: "eleven_multilingual_v2",
         voice_settings:{
           stability: 0.4,
           similarity_boost: 0.8,
           style: 0.2,
           use_speaker_boost: false
-        },
-        output_format: "mp3_22050_32"
+        }
       })
     });
 
