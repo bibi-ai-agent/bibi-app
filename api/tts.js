@@ -1,11 +1,15 @@
-export default async function handler(req, res) {
-  if (req.method !== "POST") return res.status(405).json({error:"Method not allowed"});
+export const config = { api: { bodyParser: true } };
 
+export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
-  const { voiceId, text, voice_settings } = req.body;
-  if (!voiceId || !text) return res.status(400).json({error:"voiceId and text required"});
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const { voiceId, text } = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  if (!voiceId || !text) return res.status(400).json({ error: "voiceId and text required" });
 
   try {
     const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
@@ -16,20 +20,21 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_multilingual_v2",
-        voice_settings: voice_settings || {
-          stability: 0.4,
+        model_id: "eleven_turbo_v2_5",
+        language_code: "tr",
+        voice_settings: {
+          stability: 0.5,
           similarity_boost: 0.8,
           style: 0.2,
-          use_speaker_boost: false
+          use_speaker_boost: true
         },
-        output_format: "mp3_22050_32"
+        output_format: "mp3_44100_128"
       })
     });
 
     if (!response.ok) {
       const err = await response.text();
-      return res.status(response.status).json({error: err});
+      return res.status(response.status).json({ error: err });
     }
 
     const buffer = await response.arrayBuffer();
@@ -37,6 +42,6 @@ export default async function handler(req, res) {
     res.setHeader("Content-Length", buffer.byteLength);
     return res.status(200).send(Buffer.from(buffer));
   } catch (e) {
-    return res.status(500).json({error: e.message});
+    return res.status(500).json({ error: e.message });
   }
 }
