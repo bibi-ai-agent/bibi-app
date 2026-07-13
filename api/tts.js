@@ -8,7 +8,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const { voiceId, text } = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  const { voiceId, text } = body;
   if (!voiceId || !text) return res.status(400).json({ error: "voiceId and text required" });
 
   try {
@@ -16,12 +17,11 @@ export default async function handler(req, res) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "xi-api-key": process.env.ELEVENLABS_KEY
+        "xi-api-key": "sk_fd5679c71c518b98f1549c7f8118da6710cf7943b971e84b"
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_turbo_v2_5",
-        language_code: "tr",
+        model_id: "eleven_multilingual_v2",
         voice_settings: {
           stability: 0.5,
           similarity_boost: 0.8,
