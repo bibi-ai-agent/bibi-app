@@ -1,6 +1,6 @@
 const https = require('https')
 
-const STRIPE_SECRET = 'sk_test_51TuqqTFbpmZ6DrU3FN3b6AYCcVZ0frbICdcjMOhRQJGfzU4LXJS95TSqtTBGloUbiaBIJ1SfAYB'
+const STRIPE_SECRET = 'sk_test_51TuqqTFbpmZ6DrU3FN3b6AYCcVZ0frbICdcjMOhRQJGfzU4LXJS95TSqtTBGloUbiaBIJ1SfAYBjHypOOypfgNPb00MF0K3qDK'
 
 const PRICE_IDS = {
   go: 'price_1TuqvTFbpmZ6DrU3LquWuEj1',
