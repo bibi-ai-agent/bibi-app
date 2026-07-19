@@ -1,4 +1,4 @@
-const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY
+const STRIPE_SECRET = 'sk_test_51TuqqTFbpmZ6DrU3FN3b6AYCcVZ0frbICdcjMOhRQJGfzU4LXJS95TSqtTBGloUbiaBIJ1SfAYB'
 const PRICE_IDS = {
   go: 'price_1TuqvTFbpmZ6DrU3LquWuEj1',
   pro: 'price_1TuqwhFbpmZ6DrU3zKWnWE4i'
