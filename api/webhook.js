@@ -7,21 +7,20 @@ const SUPABASE_SERVICE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 
 module.exports.config = { api: { bodyParser: false } }
 
-function supabaseUpdate(table, data, filter) {
+function supabaseRequest(method, path, data) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify(data)
-    const url = `${SUPABASE_URL}/rest/v1/${table}?${filter}`
-    const parsed = new URL(url)
+    const parsed = new URL(`${SUPABASE_URL}/rest/v1/${path}`)
     const options = {
       hostname: parsed.hostname,
       path: parsed.pathname + parsed.search,
-      method: 'PATCH',
+      method,
       headers: {
         'apikey': SUPABASE_SERVICE_KEY,
         'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
-        'Prefer': 'return=minimal'
+        'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : 'return=minimal'
       }
     }
     const req = https.request(options, res => {
@@ -37,9 +36,7 @@ function supabaseUpdate(table, data, filter) {
 
 function verifyStripeSignature(payload, sig, secret) {
   const parts = sig.split(',').reduce((acc, part) => {
-    const [k, v] = part.split('=')
-    acc[k] = v
-    return acc
+    const [k, v] = part.split('='); acc[k] = v; return acc
   }, {})
   const timestamp = parts.t
   const signatures = Object.keys(parts).filter(k => k.startsWith('v')).map(k => parts[k])
@@ -69,23 +66,25 @@ module.exports = async function handler(req, res) {
   if (event.type === 'checkout.session.completed') {
     const { parentId, plan } = data.metadata || {}
     if (parentId && plan) {
-      await supabaseUpdate('subscriptions', {
+      // Önce kayıt var mı kontrol et, yoksa upsert yap
+      await supabaseRequest('POST', 'subscriptions?on_conflict=parent_id', {
+        parent_id: parentId,
         plan,
         stripe_customer_id: data.customer,
         stripe_subscription_id: data.subscription,
         status: 'active',
         updated_at: new Date().toISOString()
-      }, `parent_id=eq.${parentId}`)
+      })
     }
   }
 
   if (event.type === 'customer.subscription.deleted') {
     const subId = data.id
-    await supabaseUpdate('subscriptions', {
+    await supabaseRequest('PATCH', `subscriptions?stripe_subscription_id=eq.${subId}`, {
       plan: 'free',
       status: 'cancelled',
       updated_at: new Date().toISOString()
-    }, `stripe_subscription_id=eq.${subId}`)
+    })
   }
 
   return res.status(200).json({ received: true })
