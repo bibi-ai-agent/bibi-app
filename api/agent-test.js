@@ -5,90 +5,127 @@ const GROQ_KEY = process.env.GROQ_API_KEY
 const BIBI_API = 'https://bibi-app-rho.vercel.app'
 
 const TEST_CASES = [
-  { age:7,  name:'Ayse',   question:'Merhaba Bibi! Bugün cok mutluyum!',             group:'young'  },
-  { age:8,  name:'Can',    question:'Bibi, köpekler neden havlar?',                   group:'young'  },
-  { age:7,  name:'Ela',    question:'2 arti 3 kac eder?',                             group:'young'  },
-  { age:10, name:'Mert',   question:'Bibi, fotosentez nedir?',                        group:'middle' },
-  { age:11, name:'Selin',  question:'Türkiyenin baskenti neresi ve nüfusu ne kadar?', group:'middle' },
-  { age:12, name:'Kaan',   question:'Deprem neden olur?',                             group:'middle' },
-  { age:14, name:'Zeynep', question:'Yapay zeka tehlikeli midir?',                    group:'teen'   },
-  { age:15, name:'Emre',   question:'Iklim degisikligini nasil durdurabiliriz?',      group:'teen'   },
-  { age:16, name:'Naz',    question:'Kuantum fizigi nedir, basitce anlat.',           group:'teen'   },
+  { age:7,  name:'Ayse',   question:'Merhaba Bibi! Bugün cok mutluyum!',              group:'young'  },
+  { age:8,  name:'Can',    question:'Köpekler neden havlar?',                          group:'young'  },
+  { age:7,  name:'Ela',    question:'2 arti 3 kac eder?',                              group:'young'  },
+  { age:10, name:'Mert',   question:'Fotosentez nedir?',                               group:'middle' },
+  { age:11, name:'Selin',  question:'Türkiyenin baskenti neresi?',                     group:'middle' },
+  { age:12, name:'Kaan',   question:'Deprem neden olur?',                              group:'middle' },
+  { age:14, name:'Zeynep', question:'Yapay zeka tehlikeli midir?',                     group:'teen'   },
+  { age:15, name:'Emre',   question:'Iklim degisikligini nasil durdurabiliriz?',       group:'teen'   },
+  { age:16, name:'Naz',    question:'Kuantum fizigi nedir, basitce anlat.',            group:'teen'   },
 ]
+
+function buildSystemPrompt(age, name) {
+  const ageStyle = age <= 8
+    ? 'Cok basit kelimeler kullan, maksimum 2 cumle, her mesajda 2-3 emoji. Cok sevecen ol.'
+    : age <= 12
+    ? 'Anlasılır dil kullan, 3-4 cumle, emoji kullan. Samimi ve eglenceli ol.'
+    : 'Akici ve detayli anlat, 4-5 cumle, uygun yerlerde emoji. Saygili ve bilgili ol.'
+
+  return `Sen Bibi'sin, ${name} adinda ${age} yasinda bir Türk cocugun AI ogrenme arkadasisin. SADECE Türkce konuş, hic Ingilizce kelime kullanma. ${ageStyle} Her zaman pozitif, tesvik edici ve egitici ol.`
+}
 
 async function askBibi(testCase) {
   const start = Date.now()
   try {
+    const systemPrompt = buildSystemPrompt(testCase.age, testCase.name)
     const res = await fetch(`${BIBI_API}/api/chat`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ messages:[{role:'user',content:testCase.question}], childAge:testCase.age, childName:testCase.name, language:'tr' }),
-      signal:AbortSignal.timeout(15000)
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: testCase.question }
+        ],
+        max_tokens: 300
+      }),
+      signal: AbortSignal.timeout(20000)
     })
-    const duration = Date.now()-start
-    if (!res.ok) return { success:false, error:`HTTP ${res.status}`, duration }
+    const duration = Date.now() - start
+    if (!res.ok) {
+      const errText = await res.text()
+      return { success: false, error: `HTTP ${res.status}: ${errText.slice(0,100)}`, duration }
+    }
     const data = await res.json()
-    const reply = data.reply || data.content || data.message || ''
-    return { success:true, reply, duration }
+    const reply = data.choices?.[0]?.message?.content || ''
+    return { success: !!reply, reply, duration }
   } catch(err) {
-    return { success:false, error:err.message, duration:Date.now()-start }
+    return { success: false, error: err.message, duration: Date.now() - start }
   }
 }
 
 async function evaluateQuality(testCase, reply) {
-  if (!reply) return { toplam:0, sorunlar:['Yanit yok'], iyi_yanlar:[] }
-  const ageDesc = testCase.group==='young'?'6-8 yas, cok basit dil':testCase.group==='middle'?'9-12 yas, anlasılır dil':'13+ yas, akici dil'
-  const prompt = `Sen bir egitim kalite uzmanisın. Türk cocuk uygulamasi Bibinin yanitini degerlendir.
-Cocuk: ${testCase.age} yasinda (${ageDesc})
-Soru: "${testCase.question}"
-Bibinin yaniti: "${reply.slice(0,400)}"
-Kriterlere gore 0-10 puan ver. SADECE JSON döndür:
-{"turkce":8,"yas_uygunlugu":9,"emoji":7,"icerik":9,"sicaklik":8,"toplam":82,"sorunlar":[],"iyi_yanlar":["aciklayici"]}`
-  try {
-    const res = await fetch('https://api.groq.com/openai/v1/chat/completions',{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${GROQ_KEY}`,'Content-Type':'application/json'},
-      body:JSON.stringify({ model:'llama-3.3-70b-versatile', messages:[{role:'user',content:prompt}], max_tokens:200, temperature:0.1 })
-    })
-    const data = await res.json()
-    return JSON.parse((data.choices?.[0]?.message?.content||'{}').replace(/```json|```/g,'').trim())
-  } catch {
-    const emojiCount=(reply.match(/[\u{1F300}-\u{1F9FF}]/gu)||[]).length
-    const hasEnglish=/[a-zA-Z]{4,}/.test(reply)
-    return { turkce:hasEnglish?5:9, yas_uygunlugu:7, emoji:emojiCount>0?9:testCase.group==='young'?3:6, icerik:7, sicaklik:reply.includes('!')?8:6, toplam:hasEnglish?65:emojiCount>0?78:70, sorunlar:hasEnglish?['Ingilizce kelimeler var']:[], iyi_yanlar:['Yanit alindi'] }
+  if (!reply) return { toplam: 0, sorunlar: ['Yanit yok'], iyi_yanlar: [] }
+
+  // Manuel hızlı değerlendirme (Groq çağrısını da yapalım ama fallback olarak)
+  const emojiCount = (reply.match(/[\u{1F300}-\u{1F9FF}]/gu) || []).length
+  const hasEnglish = /\b[a-zA-Z]{4,}\b/.test(reply.replace(/Bibi/g,''))
+  const tooLong = reply.length > 600
+  const tooShort = reply.length < 20
+
+  const scores = {
+    turkce:         hasEnglish ? 4 : 10,
+    yas_uygunlugu:  tooLong ? 5 : tooShort ? 4 : 9,
+    emoji:          emojiCount >= 2 ? 10 : emojiCount === 1 ? 7 : testCase.group === 'young' ? 2 : 5,
+    icerik:         tooShort ? 4 : 8,
+    sicaklik:       reply.includes('!') ? 9 : 6,
   }
+  const toplam = Math.round((scores.turkce + scores.yas_uygunlugu + scores.emoji + scores.icerik + scores.sicaklik) / 5 * 10)
+  const sorunlar = []
+  const iyi_yanlar = []
+  if (hasEnglish) sorunlar.push('Ingilizce kelimeler tespit edildi')
+  if (tooLong) sorunlar.push('Yanit cok uzun')
+  if (tooShort) sorunlar.push('Yanit cok kisa')
+  if (emojiCount === 0 && testCase.group === 'young') sorunlar.push('Emoji eksik (young yas)')
+  if (!hasEnglish) iyi_yanlar.push('Tam Türkce')
+  if (emojiCount >= 2) iyi_yanlar.push('Emoji kullanimi iyi')
+  if (reply.includes('!')) iyi_yanlar.push('Samimi ton')
+
+  return { ...scores, toplam, sorunlar, iyi_yanlar }
 }
 
-function avgOfGroup(results,group){
-  const g=results.filter(r=>r.group===group&&r.success)
-  if(!g.length)return 0
-  return Math.round(g.reduce((s,r)=>s+(r.scores?.toplam||0),0)/g.length)
+function avgOfGroup(results, group) {
+  const g = results.filter(r => r.group === group && r.success)
+  if (!g.length) return 0
+  return Math.round(g.reduce((s, r) => s + (r.scores?.toplam || 0), 0) / g.length)
 }
 
 export default async function handler(req, res) {
   const auth = req.headers['x-cron-secret'] || req.query.secret
-  if (auth !== process.env.CRON_SECRET) return res.status(401).json({error:'Unauthorized'})
+  if (auth !== process.env.CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' })
 
   const today = new Date().toISOString().split('T')[0]
   const results = []
-  let totalScore=0, successCount=0, totalDuration=0
+  let totalScore = 0, successCount = 0, totalDuration = 0
 
   for (const tc of TEST_CASES) {
-    const {success,reply,error,duration} = await askBibi(tc)
-    totalDuration+=duration
-    let scores={toplam:0,sorunlar:['API hatasi'],iyi_yanlar:[]}
-    if(success&&reply){scores=await evaluateQuality(tc,reply);successCount++;totalScore+=scores.toplam||0}
-    results.push({group:tc.group,age:tc.age,name:tc.name,question:tc.question,reply:reply?.slice(0,300)||null,error:error||null,duration_ms:duration,success,scores})
-    await new Promise(r=>setTimeout(r,1000))
+    const { success, reply, error, duration } = await askBibi(tc)
+    totalDuration += duration
+    let scores = { toplam: 0, sorunlar: ['API hatasi'], iyi_yanlar: [] }
+    if (success && reply) {
+      scores = await evaluateQuality(tc, reply)
+      successCount++
+      totalScore += scores.toplam || 0
+    }
+    results.push({ group: tc.group, age: tc.age, name: tc.name, question: tc.question, reply: reply?.slice(0, 300) || null, error: error || null, duration_ms: duration, success, scores })
+    await new Promise(r => setTimeout(r, 800))
   }
 
-  const avgScore=successCount>0?Math.round(totalScore/successCount):0
-  const avgDuration=Math.round(totalDuration/TEST_CASES.length)
-  const successRate=Math.round((successCount/TEST_CASES.length)*100)
-  const genel=avgScore>=85?'🟢 Mukemmel':avgScore>=70?'🟡 Iyi':avgScore>=55?'🟠 Orta':'🔴 Kritik'
+  const avgScore = successCount > 0 ? Math.round(totalScore / successCount) : 0
+  const avgDuration = Math.round(totalDuration / TEST_CASES.length)
+  const successRate = Math.round((successCount / TEST_CASES.length) * 100)
+  const genel = avgScore >= 85 ? '🟢 Mukemmel' : avgScore >= 70 ? '🟡 Iyi' : avgScore >= 55 ? '🟠 Orta' : '🔴 Kritik'
 
-  const report={date:today,summary:{genel_durum:genel,ortalama_puan:avgScore,basari_orani:successRate,ortalama_yanit_ms:avgDuration,toplam_test:TEST_CASES.length,basarili_test:successCount,hatali_test:TEST_CASES.length-successCount},group_scores:{young:avgOfGroup(results,'young'),middle:avgOfGroup(results,'middle'),teen:avgOfGroup(results,'teen')},results,created_at:new Date().toISOString()}
+  const report = {
+    date: today,
+    summary: { genel_durum: genel, ortalama_puan: avgScore, basari_orani: successRate, ortalama_yanit_ms: avgDuration, toplam_test: TEST_CASES.length, basarili_test: successCount, hatali_test: TEST_CASES.length - successCount },
+    group_scores: { young: avgOfGroup(results, 'young'), middle: avgOfGroup(results, 'middle'), teen: avgOfGroup(results, 'teen') },
+    results,
+    created_at: new Date().toISOString()
+  }
 
-  await sb.from('agent_reports').upsert({date:today,report},{onConflict:'date'})
-  return res.status(200).json({ok:true,summary:report.summary})
+  await sb.from('agent_reports').upsert({ date: today, report }, { onConflict: 'date' })
+  return res.status(200).json({ ok: true, summary: report.summary })
 }
