@@ -192,7 +192,7 @@ async function sendEmail(report) {
     headers: { 'Authorization': `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: 'Bibi Agent <onboarding@resend.dev>',
-      to: ['birkankacar88@gmail.com', 'osman.yirtici@outlook.com'],
+      to: ['birkankacar88@gmail.com'],
       subject,
       html
     })
