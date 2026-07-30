@@ -3,6 +3,10 @@
     {
       "path": "/api/agent-test",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/learning-loop",
+      "schedule": "0 7 * * 1"
     }
   ]
 }
