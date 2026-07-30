@@ -1,12 +1,8 @@
 {
   "crons": [
-    {
-      "path": "/api/agent-test",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/learning-loop",
-      "schedule": "0 7 * * 1"
-    }
+    { "path": "/api/agent-test",      "schedule": "0 6 * * *"   },
+    { "path": "/api/check-alerts",    "schedule": "0 7 * * *"   },
+    { "path": "/api/generate-letter", "schedule": "0 8 * * 1"   },
+    { "path": "/api/learning-loop",   "schedule": "0 9 * * 1"   }
   ]
 }
