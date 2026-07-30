@@ -4,54 +4,47 @@ const GROQ_KEY    = process.env.GROQ_KEY
 const GEMINI_KEY  = process.env.GEMINI_KEY
 const MISTRAL_KEY = process.env.MISTRAL_KEY
 
-// ══════════════════════════════════════
-// MODEL ÇAĞRILARI
-// ══════════════════════════════════════
-
 async function callGroq(messages, maxTokens) {
   const start = Date.now()
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_KEY },
       body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages, max_tokens: maxTokens, temperature: 0.7 }),
       signal: AbortSignal.timeout(12000)
     })
     const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || ""
-    return { model: "groq-llama3.3", reply, ms: Date.now() - start, ok: !!reply }
+    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || ""
+    return { model: "groq", reply, ms: Date.now() - start, ok: !!reply }
   } catch(e) {
-    return { model: "groq-llama3.3", reply: "", ms: Date.now() - start, ok: false, error: e.message }
+    return { model: "groq", reply: "", ms: Date.now() - start, ok: false, error: e.message }
   }
 }
 
 async function callGemini(messages, maxTokens) {
   const start = Date.now()
   try {
-    // Gemini formatına çevir
-    const systemMsg = messages.find(m => m.role === "system")
-    const chatMsgs  = messages.filter(m => m.role !== "system")
-
-    const contents = chatMsgs.map(m => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }]
-    }))
-
+    const systemMsg = messages.find(function(m) { return m.role === "system" })
+    const chatMsgs = messages.filter(function(m) { return m.role !== "system" })
+    const contents = chatMsgs.map(function(m) {
+      return { role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }
+    })
     const body = {
-      contents,
-      systemInstruction: systemMsg ? { parts: [{ text: systemMsg.content }] } : undefined,
+      contents: contents,
       generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
     }
-
+    if (systemMsg) {
+      body.systemInstruction = { parts: [{ text: systemMsg.content }] }
+    }
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + GEMINI_KEY,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: AbortSignal.timeout(12000) }
     )
     const data = await res.json()
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || ""
-    return { model: "gemini-2.0-flash", reply, ms: Date.now() - start, ok: !!reply }
+    const reply = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0] && data.candidates[0].content.parts[0].text || ""
+    return { model: "gemini", reply, ms: Date.now() - start, ok: !!reply }
   } catch(e) {
-    return { model: "gemini-2.0-flash", reply: "", ms: Date.now() - start, ok: false, error: e.message }
+    return { model: "gemini", reply: "", ms: Date.now() - start, ok: false, error: e.message }
   }
 }
 
@@ -60,114 +53,62 @@ async function callMistral(messages, maxTokens) {
   try {
     const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${MISTRAL_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + MISTRAL_KEY },
       body: JSON.stringify({ model: "mistral-large-latest", messages, max_tokens: maxTokens, temperature: 0.7 }),
       signal: AbortSignal.timeout(12000)
     })
     const data = await res.json()
-    const reply = data.choices?.[0]?.message?.content || ""
-    return { model: "mistral-large", reply, ms: Date.now() - start, ok: !!reply }
+    const reply = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || ""
+    return { model: "mistral", reply, ms: Date.now() - start, ok: !!reply }
   } catch(e) {
-    return { model: "mistral-large", reply: "", ms: Date.now() - start, ok: false, error: e.message }
+    return { model: "mistral", reply: "", ms: Date.now() - start, ok: false, error: e.message }
   }
 }
 
-// ══════════════════════════════════════
-// HAKEM DEĞERLENDİRMESİ
-// ══════════════════════════════════════
-async function judgeReplies(candidates, systemPrompt, userMessage) {
-  const valid = candidates.filter(c => c.ok && c.reply?.trim().length > 10)
+async function judgeReplies(candidates, userMessage) {
+  const valid = candidates.filter(function(c) { return c.ok && c.reply && c.reply.trim().length > 10 })
   if (valid.length === 0) return null
   if (valid.length === 1) return valid[0]
 
-  const prompt = `Sen bir pedagojik kalite hakemine sin. Bir çocuk için hazırlanmış yapay zeka yanıtlarını değerlendir.
+  const candidateText = valid.map(function(c, i) {
+    return "[" + (i+1) + "] " + c.model + ":\n\"" + c.reply.slice(0, 300) + "\""
+  }).join("\n\n")
 
-SİSTEM PROMPTU ÖZETI: ${systemPrompt?.slice(0, 300) || "Çocuk eğitim asistanı"}
-
-ÇOCUĞUN SORUSU: "${userMessage}"
-
-DEĞERLENDİRME KRİTERLERİ (her biri 0-20 puan):
-1. Doğruluk: Bilgi gerçek ve doğru mu?
-2. Yaş uygunluğu: Dil ve içerik yaşa uygun mu?
-3. Pedagojik değer: Öğrenmeyi destekliyor mu, merak uyandırıyor mu?
-4. Türkçe kalitesi: %100 Türkçe, akıcı ve doğal mı?
-5. Sıcaklık: Samimi, destekleyici ve motive edici mi?
-
-YANITLAR:
-${valid.map((c, i) => `[${i + 1}] ${c.model}:\n"${c.reply.slice(0, 400)}"`).join('\n\n')}
-
-SADECE JSON döndür:
-{"kazanan": 1, "puan1": 85, "puan2": 78, "puan3": 72, "neden": "kısa açıklama"}`
+  const prompt = "Cocuk egitim asistaninin yanit kalitesini degerlendir.\n\nSORU: \"" + (userMessage || "") + "\"\n\nYANITLAR:\n" + candidateText + "\n\nSADECE JSON don dur:\n{\"kazanan\": 1, \"neden\": \"kisa aciklama\"}"
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_KEY}` },
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + GROQ_KEY },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "Sen bir eğitim kalite uzmanısın. SADECE JSON döndür." },
+          { role: "system", content: "Egitim kalite hakemi. SADECE JSON dondur." },
           { role: "user", content: prompt }
         ],
-        max_tokens: 200,
+        max_tokens: 100,
         temperature: 0.1
       }),
       signal: AbortSignal.timeout(8000)
     })
     const data = await res.json()
-    const text = data.choices?.[0]?.message?.content || '{}'
-    const result = JSON.parse(text.replace(/```json|```/g, '').trim())
-    const winnerIdx = (result.kazanan || 1) - 1
-    const winner = valid[Math.min(winnerIdx, valid.length - 1)]
-    return { ...winner, hakem_puani: result[`puan${result.kazanan}`] || 0, hakem_neden: result.neden }
+    const text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || "{}"
+    const result = JSON.parse(text.replace(/```json|```/g, "").trim())
+    const idx = (result.kazanan || 1) - 1
+    return valid[Math.min(idx, valid.length - 1)]
   } catch {
-    // Hakem başarısız olursa en hızlı geçerli yanıtı seç
-    return valid.sort((a, b) => a.ms - b.ms)[0]
+    return valid.sort(function(a, b) { return a.ms - b.ms })[0]
   }
 }
 
-// ══════════════════════════════════════
-// KATMAN 7 — GÜVENLİK VE ETİK MOTOR
-// ══════════════════════════════════════
-function safetyCheck(reply, systemPrompt) {
-  if (!reply) return { safe: false, reason: 'Boş yanıt' }
-
-  // İngilizce kelime kontrolü
-  const englishWords = reply.match(/[a-zA-Z]{4,}/g) || []
-  const bibiExempt = ['Bibi']
-  const foreignWords = englishWords.filter(w => !bibiExempt.includes(w))
-  if (foreignWords.length > 2) {
-    return { safe: false, reason: 'Yabancı dil', words: foreignWords.slice(0,5) }
-  }
-
-  // Zararlı içerik kontrolü
-  const harmful = ['şiddet','kavga','vur','öldür','zarar ver','tehlike','silah','uyuşturucu']
-  if (harmful.some(w => reply.toLowerCase().includes(w))) {
-    return { safe: false, reason: 'Zararlı içerik' }
-  }
-
-  // Çok kısa yanıt
-  if (reply.trim().length < 15) {
-    return { safe: false, reason: 'Çok kısa yanıt' }
-  }
-
-  // Duygusal kriz tespiti (sisteme işaret et, yanıtı engelleme)
-  const crisisWords = ['intihar','kendime zarar','ölmek istiyorum','çok mutsuzum','kimse sevmiyor']
-  const hasCrisis = crisisWords.some(w => reply.toLowerCase().includes(w))
-
-  return { safe: true, hasCrisis }
+function safetyCheck(reply) {
+  if (!reply) return false
+  if (reply.trim().length < 10) return false
+  const harmful = ["saldır", "öldür", "zarar ver", "uyuşturucu", "silah"]
+  if (harmful.some(function(w) { return reply.toLowerCase().includes(w) })) return false
+  return true
 }
 
-// Güvenlik filtresi başarısız olunca fallback yanıt
-function getFallbackReply(reason, age) {
-  if (age <= 8) return "Hmm, bunu tam anlayamadım! Başka bir şey sormak ister misin? 😊"
-  if (age <= 11) return "Bu konuda sana yardımcı olamıyorum, ama başka bir şey sorarsan hemen buradayım!"
-  return "Bu konuda yanıt üretemiyorum, farklı bir soru sorabilirsin."
-}
-
-// ══════════════════════════════════════
-// ANA HANDLER
-// ══════════════════════════════════════
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*")
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -177,63 +118,38 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body
-    const { messages, max_tokens = 1000 } = body
+    const messages = body.messages || []
+    const maxTokens = body.max_tokens || 1000
 
-    if (!messages?.length) return res.status(400).json({ error: "messages required" })
+    if (!messages.length) return res.status(400).json({ error: "messages required" })
 
-    const systemMsg = messages.find(m => m.role === "system")
-    const lastUser  = [...messages].reverse().find(m => m.role === "user")
+    const lastUser = messages.slice().reverse().find(function(m) { return m.role === "user" })
 
-    // 3 modeli paralel çalıştır
-    const [groqRes, geminiRes, mistralRes] = await Promise.all([
-      GROQ_KEY    ? callGroq(messages, max_tokens)    : Promise.resolve({ model:"groq", reply:"", ok:false }),
-      GEMINI_KEY  ? callGemini(messages, max_tokens)  : Promise.resolve({ model:"gemini", reply:"", ok:false }),
-      MISTRAL_KEY ? callMistral(messages, max_tokens) : Promise.resolve({ model:"mistral", reply:"", ok:false }),
+    const results = await Promise.all([
+      GROQ_KEY    ? callGroq(messages, maxTokens)    : Promise.resolve({ model: "groq",    reply: "", ok: false }),
+      GEMINI_KEY  ? callGemini(messages, maxTokens)  : Promise.resolve({ model: "gemini",  reply: "", ok: false }),
+      MISTRAL_KEY ? callMistral(messages, maxTokens) : Promise.resolve({ model: "mistral", reply: "", ok: false }),
     ])
 
-    const candidates = [groqRes, geminiRes, mistralRes]
+    const winner = await judgeReplies(results, lastUser && lastUser.content)
 
-    // Hakem seçimi
-    const winner = await judgeReplies(candidates, systemMsg?.content, lastUser?.content)
-
-    if (!winner?.reply) {
-      return res.status(500).json({ error: "Tüm modeller başarısız oldu" })
+    if (!winner || !winner.reply) {
+      return res.status(500).json({ error: "Tum modeller basarisiz oldu" })
     }
-
-    // KATMAN 7 — Güvenlik filtresi
-    const systemMsg2 = messages.find(m => m.role === "system")
-    const ageMatch = systemMsg2?.content?.match(/(\d+) yaşında/)
-    const childAge = ageMatch ? parseInt(ageMatch[1]) : 10
-    const safety = safetyCheck(winner.reply, systemMsg2?.content)
 
     let finalReply = winner.reply
-    if (!safety.safe) {
-      // Güvenli değilse Groq'tan tekrar dene (daha kısıtlı)
-      try {
-        const retryRes = await callGroq([
-          { role: "system", content: (systemMsg2?.content || '') + "
-
-KESİN KURAL: Sadece Türkçe yaz. Kısa ve net cevap ver." },
-          ...messages.filter(m => m.role !== "system").slice(-3)
-        ], 500)
-        if (retryRes.ok && safetyCheck(retryRes.reply, '').safe) {
-          finalReply = retryRes.reply
-        } else {
-          finalReply = getFallbackReply(safety.reason, childAge)
-        }
-      } catch {
-        finalReply = getFallbackReply(safety.reason, childAge)
+    if (!safetyCheck(finalReply)) {
+      const retry = await callGroq(messages, 500)
+      if (retry.ok && safetyCheck(retry.reply)) {
+        finalReply = retry.reply
+      } else {
+        finalReply = "Seni duyuyorum! Baska bir konuda yardimci olabilir miyim?"
       }
     }
 
-    // OpenAI formatında döndür (geriye dönük uyumluluk)
     return res.status(200).json({
       choices: [{ message: { role: "assistant", content: finalReply } }],
-      _meta: {
-        winner_model: winner.model,
-        winner_score: winner.hakem_puani,
-        models: candidates.map(c => ({ model: c.model, ok: c.ok, ms: c.ms }))
-      }
+      _meta: { winner: winner.model, models: results.map(function(r) { return { model: r.model, ok: r.ok, ms: r.ms } }) }
     })
 
   } catch(e) {
