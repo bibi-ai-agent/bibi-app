@@ -10,7 +10,7 @@ async function generateTitleAndSummary(messages) {
     return (m.role === "user" ? "Cocuk: " : "Bibi: ") + m.content
   }).join("\n")
 
-  const prompt = "Asagidaki cocuk-Bibi konusmasini analiz et.\n\nKONUSMA:\n" + conversation + "\n\nSADECE JSON dondur:\n{\"title\": \"3-5 kelime baslik\", \"summary\": \"2-3 cumle ozet\", \"tags\": [\"konu1\", \"konu2\"]}"
+  const prompt = "Asagidaki cocuk-Bibi konusmasini analiz et ve asagidaki JSON formatinda dondur.\n\nKONUSMA:\n" + conversation + "\n\nKURALLAR:\n- title: Konusmanin gercek konusunu yansitan 2-4 kelimelik Turkce baslik. Ornekler: \"Deprem ve Levhalar\", \"Kesir Sorulari\", \"Basketbol Konusmasi\", \"Gunluk Sohbet\", \"Matematik Odevi\"\n- summary: Ne ogrenildi veya konusuldu, 1-2 cumle, net ve sade Turkce\n- tags: En fazla 3 konu etiketi, sadece su listeden sec: matematik, fen, tarih, dil, sanat, odev, gunluk\n\nSADECE JSON dondur, baska hicbir sey yazma:\n{\"title\": \"..\", \"summary\": \"..\", \"tags\": [\"..\"]}"
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
