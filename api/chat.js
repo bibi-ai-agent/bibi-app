@@ -127,6 +127,45 @@ SADECE JSON döndür:
 }
 
 // ══════════════════════════════════════
+// KATMAN 7 — GÜVENLİK VE ETİK MOTOR
+// ══════════════════════════════════════
+function safetyCheck(reply, systemPrompt) {
+  if (!reply) return { safe: false, reason: 'Boş yanıt' }
+
+  // İngilizce kelime kontrolü
+  const englishWords = reply.match(/[a-zA-Z]{4,}/g) || []
+  const bibiExempt = ['Bibi']
+  const foreignWords = englishWords.filter(w => !bibiExempt.includes(w))
+  if (foreignWords.length > 2) {
+    return { safe: false, reason: 'Yabancı dil', words: foreignWords.slice(0,5) }
+  }
+
+  // Zararlı içerik kontrolü
+  const harmful = ['şiddet','kavga','vur','öldür','zarar ver','tehlike','silah','uyuşturucu']
+  if (harmful.some(w => reply.toLowerCase().includes(w))) {
+    return { safe: false, reason: 'Zararlı içerik' }
+  }
+
+  // Çok kısa yanıt
+  if (reply.trim().length < 15) {
+    return { safe: false, reason: 'Çok kısa yanıt' }
+  }
+
+  // Duygusal kriz tespiti (sisteme işaret et, yanıtı engelleme)
+  const crisisWords = ['intihar','kendime zarar','ölmek istiyorum','çok mutsuzum','kimse sevmiyor']
+  const hasCrisis = crisisWords.some(w => reply.toLowerCase().includes(w))
+
+  return { safe: true, hasCrisis }
+}
+
+// Güvenlik filtresi başarısız olunca fallback yanıt
+function getFallbackReply(reason, age) {
+  if (age <= 8) return "Hmm, bunu tam anlayamadım! Başka bir şey sormak ister misin? 😊"
+  if (age <= 11) return "Bu konuda sana yardımcı olamıyorum, ama başka bir şey sorarsan hemen buradayım!"
+  return "Bu konuda yanıt üretemiyorum, farklı bir soru sorabilirsin."
+}
+
+// ══════════════════════════════════════
 // ANA HANDLER
 // ══════════════════════════════════════
 export default async function handler(req, res) {
@@ -161,9 +200,35 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Tüm modeller başarısız oldu" })
     }
 
+    // KATMAN 7 — Güvenlik filtresi
+    const systemMsg2 = messages.find(m => m.role === "system")
+    const ageMatch = systemMsg2?.content?.match(/(\d+) yaşında/)
+    const childAge = ageMatch ? parseInt(ageMatch[1]) : 10
+    const safety = safetyCheck(winner.reply, systemMsg2?.content)
+
+    let finalReply = winner.reply
+    if (!safety.safe) {
+      // Güvenli değilse Groq'tan tekrar dene (daha kısıtlı)
+      try {
+        const retryRes = await callGroq([
+          { role: "system", content: (systemMsg2?.content || '') + "
+
+KESİN KURAL: Sadece Türkçe yaz. Kısa ve net cevap ver." },
+          ...messages.filter(m => m.role !== "system").slice(-3)
+        ], 500)
+        if (retryRes.ok && safetyCheck(retryRes.reply, '').safe) {
+          finalReply = retryRes.reply
+        } else {
+          finalReply = getFallbackReply(safety.reason, childAge)
+        }
+      } catch {
+        finalReply = getFallbackReply(safety.reason, childAge)
+      }
+    }
+
     // OpenAI formatında döndür (geriye dönük uyumluluk)
     return res.status(200).json({
-      choices: [{ message: { role: "assistant", content: winner.reply } }],
+      choices: [{ message: { role: "assistant", content: finalReply } }],
       _meta: {
         winner_model: winner.model,
         winner_score: winner.hakem_puani,
