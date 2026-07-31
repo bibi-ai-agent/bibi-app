@@ -4,9 +4,6 @@ const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_K
 const GROQ_KEY = process.env.GROQ_KEY
 
 async function generateOpeningMessage(child, recentSessions, memory) {
-  if (!recentSessions || recentSessions.length === 0) {
-    return null // Ilk oturum, varsayilan acilis mesaji kullanilir
-  }
 
   const sessionSummaries = recentSessions.slice(0, 3).map(function(s) {
     return "- " + (s.title || "Sohbet") + ": " + (s.summary || "")
