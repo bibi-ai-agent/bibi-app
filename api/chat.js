@@ -106,6 +106,10 @@ function safetyCheck(reply) {
   if (reply.trim().length < 10) return false
   const harmful = ["saldır", "öldür", "zarar ver", "uyuşturucu", "silah"]
   if (harmful.some(function(w) { return reply.toLowerCase().includes(w) })) return false
+  // İngilizce kelime kontrolü - 4+ harfli İngilizce kelimeler
+  const englishPattern = /(again|okay|ok|yes|no|hello|hi|great|nice|good|well|sure|thanks|thank|you|the|and|for|are|but|not|this|with|have|from|they|will|been|what|your|when|can|all|one|their|there|about|out|up|so|if|do|at|be|by|we|as|an|it|is|in|of|to|a)/gi
+  const englishWords = reply.match(englishPattern) || []
+  if (englishWords.length >= 2) return false
   return true
 }
 

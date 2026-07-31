@@ -32,7 +32,7 @@ async function generateOpeningMessage(child, recentSessions, memory) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "Sen Bibi'sin. Turkce yaz. Sadece mesaj metnini dondur." },
+          { role: "system", content: "Sen Bibi'sin — cocuklar icin Turkce AI ogrenme arkadasisin. KESİN KURAL: Sadece ve sadece Turkce yaz. Hic Ingilizce kelime kullanma. again, okay, hi, hello gibi kelimeler yasak. Sadece mesaj metnini yaz, baska hicbir sey yazma." },
           { role: "user", content: prompt }
         ],
         max_tokens: 150,
