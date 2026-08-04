@@ -20,7 +20,7 @@ async function sendAlertEmail(parentEmail, parentName, childName, alerts) {
     '<p style="color:#6b7280;">' + childName + ' için aşağıdaki uyarılar oluştu:</p>' +
     '<table style="width:100%;border-collapse:collapse;background:#fff5f5;border-radius:8px;overflow:hidden;">' +
     alertRows + '</table>' +
-    '<p style="color:#6b7280;margin-top:16px;">Bibi uygulamasından daha fazla bilgi alabilirsiniz.</p>' +
+    '<p style="color:#6b7280;margin-top:16px;">Dai uygulamasından daha fazla bilgi alabilirsiniz.</p>' +
     '</div></div></body></html>'
 
   await fetch('https://api.resend.com/emails', {
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
         newAlerts.push({
           child_id: child.id,
           alert_type: 'inactive',
-          message: child.name + ' 5 gündür Bibi ile konuşmadı. Uygulamayı birlikte açmak isteyebilirsiniz. 📱'
+          message: child.name + ' 5 gündür Dai ile konuşmadı. Uygulamayı birlikte açmak isteyebilirsiniz. 📱'
         })
       }
 

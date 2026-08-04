@@ -117,7 +117,7 @@ async function sendLetterEmail(parentEmail, parentName, childName, letter, week)
     '<p style="color:#374151;">Sayın ' + parentName + ',</p>' +
     paragraphs +
     '</div>' +
-    '<div style="background:#f9fafb;padding:16px;text-align:center;color:#9ca3af;font-size:12px;">Bibi AI • Her Pazartesi otomatik gönderilir</div>' +
+    '<div style="background:#f9fafb;padding:16px;text-align:center;color:#9ca3af;font-size:12px;">Dai AI • Her Pazartesi otomatik gönderilir</div>' +
     '</div></body></html>'
 
   await fetch('https://api.resend.com/emails', {

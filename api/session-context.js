@@ -20,7 +20,7 @@ async function generateOpeningMessage(child, recentSessions, memory) {
     ? "Kisa, 2-3 cumle, 1 emoji, arkadascabirsohbet tonu."
     : "Kisa, 2-3 cumle, samimi ve olgun ton."
 
-  const prompt = "Bir cocuk Bibi ile yeni sohbet acti. Kisiselllestirilmis karsilama mesaji yaz.\n\nCOCUK: " + child.name + ", " + child.age + " yas\nSON OTURUMLAR:\n" + sessionSummaries + "\nPROFIL: " + (memoryText || "yeni kullanici") + "\n\nKURAL: " + ageStyle + " Gecmis oturuma dogal atif yap. SADECE mesaj metnini yaz, baska hicbir sey yazma."
+  const prompt = "Bir cocuk Dai ile yeni sohbet acti. Kisiselllestirilmis karsilama mesaji yaz.\n\nCOCUK: " + child.name + ", " + child.age + " yas\nSON OTURUMLAR:\n" + sessionSummaries + "\nPROFIL: " + (memoryText || "yeni kullanici") + "\n\nKURAL: " + ageStyle + " Gecmis oturuma dogal atif yap. SADECE mesaj metnini yaz, baska hicbir sey yazma."
 
   try {
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -29,7 +29,7 @@ async function generateOpeningMessage(child, recentSessions, memory) {
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
         messages: [
-          { role: "system", content: "Sen Bibi'sin — cocuklar icin Turkce AI ogrenme arkadasisin. KESİN KURAL: Sadece ve sadece Turkce yaz. Hic Ingilizce kelime kullanma. again, okay, hi, hello gibi kelimeler yasak. Sadece mesaj metnini yaz, baska hicbir sey yazma." },
+          { role: "system", content: "Sen Dai'sin — cocuklar icin Turkce AI ogrenme arkadasisin. KESİN KURAL: Sadece ve sadece Turkce yaz. Hic Ingilizce kelime kullanma. again, okay, hi, hello gibi kelimeler yasak. Sadece mesaj metnini yaz, baska hicbir sey yazma." },
           { role: "user", content: prompt }
         ],
         max_tokens: 150,
